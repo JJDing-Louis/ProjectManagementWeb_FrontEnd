@@ -1,0 +1,147 @@
+<script setup lang="ts">
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
+import PageHeader from '@/components/PageHeader.vue'
+import { services } from '@/services/mockServices'
+import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
+import { ApiError, type Project, type TaskStatus, type User } from '@/types/models'
+const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+const ui = useUiStore()
+const projectId = String(route.params.projectId)
+const taskId = computed(() => String(route.params.taskId ?? ''))
+const editing = computed(() => Boolean(taskId.value))
+const project = ref<Project>()
+const users = ref<User[]>([])
+const error = ref('')
+const statuses: TaskStatus[] = ['Pending', 'InProgress', 'Blocked', 'Completed']
+const form = reactive({
+  title: '',
+  description: '',
+  assigneeId: '',
+  startAt: '',
+  deadline: '',
+  status: 'Pending' as TaskStatus,
+  version: undefined as number | undefined,
+})
+const fullEdit = computed(() => auth.isTaskAdministrator)
+const toLocal = (value: string) => value.slice(0, 16)
+onMounted(async () => {
+  ;[project.value, users.value] = await Promise.all([
+    services.projects.get(projectId),
+    services.users.list(),
+  ])
+  if (editing.value) {
+    const task = await services.tasks.get(taskId.value)
+    Object.assign(form, {
+      title: task.title,
+      description: task.description,
+      assigneeId: task.assigneeId,
+      startAt: toLocal(task.startAt),
+      deadline: toLocal(task.deadline),
+      status: task.status,
+      version: task.version,
+    })
+  }
+})
+async function submit() {
+  error.value = ''
+  try {
+    const input = {
+      ...form,
+      startAt: new Date(form.startAt).toISOString(),
+      deadline: new Date(form.deadline).toISOString(),
+    }
+    const saved = editing.value
+      ? await services.tasks.update(taskId.value, input)
+      : await services.tasks.create(projectId, input)
+    ui.notify(t('message.saved'))
+    await router.push({ name: 'task-detail', params: { projectId, taskId: saved.id } })
+  } catch (reason) {
+    error.value = reason instanceof ApiError ? reason.message : 'Save failed'
+  }
+}
+</script>
+<template>
+  <PageHeader
+    :eyebrow="project?.name"
+    :title="editing ? t('common.edit') + ' ' + t('task.detail') : t('task.new')"
+    ><button class="button secondary" @click="router.back()">
+      {{ t('common.cancel') }}
+    </button></PageHeader
+  >
+  <section class="card">
+    <div class="card-body">
+      <div v-if="error" class="alert">{{ error }}</div>
+      <form @submit.prevent="submit">
+        <div class="form-grid">
+          <div class="field">
+            <label for="task-title">{{ t('task.name') }}</label
+            ><input
+              id="task-title"
+              v-model.trim="form.title"
+              :disabled="editing && !fullEdit"
+              required
+            />
+          </div>
+          <div class="field">
+            <label for="task-form-assignee">{{ t('task.assignee') }}</label
+            ><select
+              id="task-form-assignee"
+              v-model="form.assigneeId"
+              :disabled="editing && !fullEdit"
+              required
+            >
+              <option value="">Select member</option>
+              <option
+                v-for="member in project?.members"
+                :key="member.userId"
+                :value="member.userId"
+              >
+                {{ users.find((u) => u.id === member.userId)?.displayName }}
+              </option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="task-start">{{ t('task.startAt') }}</label
+            ><input
+              id="task-start"
+              v-model="form.startAt"
+              type="datetime-local"
+              :disabled="editing && !fullEdit"
+              required
+            />
+          </div>
+          <div class="field">
+            <label for="task-deadline">{{ t('task.deadline') }}</label
+            ><input id="task-deadline" v-model="form.deadline" type="datetime-local" required />
+          </div>
+          <div class="field">
+            <label for="task-form-status">{{ t('common.status') }}</label
+            ><select id="task-form-status" v-model="form.status">
+              <option v-for="status in statuses" :key="status">{{ status }}</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label for="task-description">{{ t('task.description') }}</label
+            ><textarea
+              id="task-description"
+              v-model.trim="form.description"
+              :disabled="editing && !fullEdit"
+              required
+            />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="button secondary" @click="router.back()">
+            {{ t('common.cancel') }}</button
+          ><button class="button primary">{{ t('common.save') }}</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</template>

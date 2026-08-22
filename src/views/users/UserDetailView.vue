@@ -1,0 +1,94 @@
+<script setup lang="ts">
+import { onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
+import PageHeader from '@/components/PageHeader.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import { services } from '@/services/mockServices'
+import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
+import { ApiError, type SystemRole, type User } from '@/types/models'
+const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+const ui = useUiStore()
+const user = ref<User>()
+const error = ref('')
+const form = reactive({ role: 'Viewer' as SystemRole, isEnabled: true })
+const roles: SystemRole[] = ['Admin', 'Administrator', 'User', 'Viewer']
+onMounted(async () => {
+  try {
+    user.value = await services.users.get(String(route.params.userId))
+    form.role = user.value.role
+    form.isEnabled = user.value.isEnabled
+  } catch (reason) {
+    error.value = reason instanceof ApiError ? reason.message : 'Load failed'
+  }
+})
+async function save() {
+  if (!user.value) return
+  try {
+    user.value = await services.users.update(user.value.id, form.role, form.isEnabled)
+    ui.notify(t('message.saved'))
+  } catch (reason) {
+    error.value = reason instanceof ApiError ? reason.message : 'Save failed'
+  }
+}
+</script>
+<template>
+  <div v-if="error" class="alert">{{ error }}</div>
+  <div v-if="!user && !error" class="empty-state">{{ t('common.loading') }}</div>
+  <template v-if="user"
+    ><PageHeader eyebrow="Directory" :title="user.displayName" :description="`@${user.account}`"
+      ><button class="button secondary" @click="router.back()">
+        {{ t('common.back') }}
+      </button></PageHeader
+    >
+    <div class="detail-grid">
+      <section class="card">
+        <div class="card-header">
+          <h2>{{ t('user.detail') }}</h2>
+          <StatusBadge :value="user.role" />
+        </div>
+        <div class="card-body detail-list">
+          <div class="detail-item">
+            <label>{{ t('user.account') }}</label
+            ><strong>{{ user.account }}</strong>
+          </div>
+          <div class="detail-item">
+            <label>{{ t('user.email') }}</label
+            ><span>{{ user.email }}</span>
+          </div>
+          <div class="detail-item">
+            <label>{{ t('user.verified') }}</label
+            ><span>{{ user.isVerified ? 'Yes' : 'No' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Created</label><span>{{ new Date(user.createdAt).toLocaleString() }}</span>
+          </div>
+        </div>
+      </section>
+      <aside class="card">
+        <div class="card-header"><h2>Access</h2></div>
+        <div class="card-body">
+          <form v-if="auth.isAdmin" @submit.prevent="save">
+            <div class="field">
+              <label for="role">{{ t('user.role') }}</label
+              ><select id="role" v-model="form.role">
+                <option v-for="role in roles" :key="role">{{ role }}</option>
+              </select>
+            </div>
+            <label class="check-field"
+              ><input v-model="form.isEnabled" type="checkbox" />{{ t('common.active') }}</label
+            >
+            <div class="form-actions">
+              <button class="button primary">{{ t('common.save') }}</button>
+            </div>
+          </form>
+          <p v-else style="color: var(--slate-500)">{{ t('message.forbidden') }}</p>
+        </div>
+      </aside>
+    </div></template
+  >
+</template>
