@@ -1,6 +1,12 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { router } from '@/router'
+
+vi.mock('@/services', () => ({
+  services: {
+    auth: { restore: vi.fn().mockResolvedValue(null) },
+  },
+}))
 
 describe('Router guards', () => {
   beforeEach(() => setActivePinia(createPinia()))

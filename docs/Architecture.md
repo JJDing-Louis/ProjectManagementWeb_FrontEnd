@@ -2,7 +2,7 @@
 
 ## 架構狀態
 
-目前是 Vue 3 SPA 的 V1 前端 MVP。畫面已透過 typed service interfaces 與資料來源隔離，但實際資料來源仍是 `MockServices` 與瀏覽器 Storage；Backend HTTP adapter 尚未建立。
+目前 Vue 3 SPA 已透過 typed service interfaces、HTTP adapters 與 DTO mappers 串接 ASP.NET Core `/api/v1`。View 不直接散落 `fetch`，驗證與錯誤處理由共用 HTTP client 負責。
 
 ## Level 3 Component Diagram
 
@@ -32,15 +32,15 @@ flowchart LR
         end
 
         subgraph Infrastructure[Infrastructure]
-            MockAdapter[Mock Service Adapter<br/>Business Rules / Authorization]
-            MockRepository[Mock Repository<br/>Schema Version v1]
-            FutureHttp[Future HTTP Adapter<br/>Not Implemented]
+            HttpAdapter[HTTP Service Adapters<br/>Auth / User / Project / Task / Comment / Preference]
+            HttpClient[HTTP Client<br/>CSRF / Refresh / Timeout / Problem Details]
+            Mapper[DTO Mappers<br/>API Contract to View Models]
         end
     end
 
-    Session[(sessionStorage<br/>Mock Session)]
-    Local[(localStorage<br/>Mock Data / Locale)]
-    Backend[ASP.NET Core Web API<br/>Future]
+    Memory[(Memory<br/>Access Token)]
+    Cookie[(HttpOnly Cookie<br/>Refresh Token)]
+    Backend[ASP.NET Core Web API<br/>/api/v1]
 
     Shell --> Router
     Router --> AuthStore
@@ -52,27 +52,27 @@ flowchart LR
     AuthStore --> Contracts
     UiStore -. Toast / Drawer .-> Shell
     Contracts --> Models
-    Contracts --> MockAdapter
-    MockAdapter --> MockRepository
-    MockRepository --> Session
-    MockRepository --> Local
-    Contracts -. Adapter replacement .-> FutureHttp
-    FutureHttp -. JSON / HTTPS .-> Backend
+    Contracts --> HttpAdapter
+    HttpAdapter --> Mapper
+    HttpAdapter --> HttpClient
+    HttpClient --> Memory
+    HttpClient -. credentials include .-> Cookie
+    HttpClient -->|JSON / HTTPS| Backend
 ```
 
 ## 元件責任
 
-| 元件                 | 主要責任                                         | 不應負責                            |
-| -------------------- | ------------------------------------------------ | ----------------------------------- |
-| Views                | 組合畫面、讀取 route、觸發 service、顯示狀態     | 直接讀寫 localStorage、實作後端授權 |
-| AppShell／AppSidebar | RWD 版型、專案樹、語言切換、Logout               | Project／Task 業務規則              |
-| Vue Router           | 公開／登入路由、基本角色導向、lazy loading       | 作為安全授權邊界                    |
-| Pinia Auth Store     | 目前使用者、Session restore、登入登出狀態        | 複製所有後端業務資料                |
-| Pinia UI Store       | Sidebar 與 Toast 等全域 UI 狀態                  | 持久化 domain data                  |
-| Service Interfaces   | 定義 View 可依賴的穩定操作介面                   | 洩漏 Mock 或 HTTP 實作細節          |
-| Mock Service Adapter | 模擬授權、驗證、交易、軟刪除與版本衝突           | 被視為正式安全邊界                  |
-| Mock Repository      | schema version、seed、Storage 序列化             | 在 View 中直接暴露 Storage API      |
-| Future HTTP Adapter  | 將 service calls mapping 成 Backend HTTP request | 改變 Views 的呼叫方式               |
+| 元件                  | 主要責任                                             | 不應負責                            |
+| --------------------- | ---------------------------------------------------- | ----------------------------------- |
+| Views                 | 組合畫面、讀取 route、觸發 service、顯示狀態         | 直接讀寫 localStorage、實作後端授權 |
+| AppShell／AppSidebar  | RWD 版型、專案樹、語言切換、Logout                   | Project／Task 業務規則              |
+| Vue Router            | 公開／登入路由、基本角色導向、lazy loading           | 作為安全授權邊界                    |
+| Pinia Auth Store      | 目前使用者、Session restore、登入登出狀態            | 複製所有後端業務資料                |
+| Pinia UI Store        | Sidebar 與 Toast 等全域 UI 狀態                      | 持久化 domain data                  |
+| Service Interfaces    | 定義 View 可依賴的穩定操作介面                       | 洩漏 Mock 或 HTTP 實作細節          |
+| HTTP Service Adapters | 將 service calls mapping 成 Backend HTTP request     | 在 View 中改變 transport 細節       |
+| DTO Mappers           | 隔離 API DTO 與畫面 model                            | 實作授權或保存 token                |
+| HTTP Client           | Base URL、Bearer、CSRF、refresh、timeout、錯誤正規化 | 實作 Project／Task 業務規則         |
 
 ## 依賴方向
 
@@ -81,12 +81,12 @@ View / Store
     ↓
 Service Interface + Models
     ↓
-Mock Adapter（目前）或 HTTP Adapter（未來）
+HTTP Adapter + DTO Mapper
     ↓
-Browser Storage（目前）或 Backend API（未來）
+ASP.NET Core Backend API
 ```
 
-View 與 Store 只能依賴 service interface。串接後端時，應新增 HTTP adapter 並在應用程式組裝點替換實作，不應讓 Vue component 直接散落 `fetch` 呼叫。
+View 與 Store 只依賴 service interface；production 組裝點只匯出 HTTP services，不讓 Vue component 直接散落 `fetch` 呼叫。
 
 ## 主要資料流程
 
@@ -98,14 +98,16 @@ sequenceDiagram
     participant View as SignInView
     participant Store as AuthStore
     participant Service as AuthService
-    participant Adapter as Mock or HTTP Adapter
+    participant Adapter as HTTP Adapter
     participant Router
 
     User->>View: 輸入 Account / Password
     View->>Store: signIn()
     Store->>Service: signIn(account, password)
-    Service->>Adapter: 驗證並建立 Session
-    Adapter-->>Store: User
+    Service->>Adapter: POST login + CSRF
+    Adapter-->>Store: Access Token
+    Adapter->>Adapter: GET /auth/me
+    Adapter-->>Store: CurrentUser + functions
     Store-->>View: 更新登入狀態
     View->>Router: 前往原目標或 /projects
     Router->>Store: 檢查登入與 route meta
@@ -118,12 +120,12 @@ sequenceDiagram
     actor User
     participant View as TaskListView
     participant Service as TaskItemService
-    participant Backend as Mock Adapter or Backend API
+    participant Backend as Backend API
 
     User->>View: 選取目前頁面可修改的 Task
     User->>View: 選擇目標狀態並確認
-    View->>Service: batchUpdate(ids, status)
-    Service->>Backend: 驗證全部 ID、權限與狀態
+    View->>Service: batchUpdate(projectId, tasks+rowVersion, status)
+    Service->>Backend: 驗證全部 ID、版本、權限與狀態
     alt 任一項失敗
         Backend-->>Service: 4xx，不更新任何 Task
         Service-->>View: ApiError
@@ -146,21 +148,20 @@ sequenceDiagram
 | Preference | Settings                                        | `/settings`                             |
 | Error      | Forbidden、NotFound                             | `/forbidden`、fallback route            |
 
-## Storage Boundary
+## Browser State Boundary
 
-| Storage        | Key                                 | 用途                                               |
-| -------------- | ----------------------------------- | -------------------------------------------------- |
-| localStorage   | `project-management-web:mock-db:v1` | Mock users、projects、tasks、comments、preferences |
-| localStorage   | `project-management-web:locale`     | `zh-TW`／`en` 選擇                                 |
-| sessionStorage | `project-management-web:session:v1` | Mock 登入使用者 ID                                 |
+| 位置              | 用途                                           |
+| ----------------- | ---------------------------------------------- |
+| JavaScript memory | 短效 Access Token；重新整理後先以 refresh 恢復 |
+| HttpOnly Cookie   | Backend 管理的 Refresh Token，前端無法讀取     |
+| localStorage      | 僅保存 `zh-TW`／`en` 介面語言                  |
 
-Storage 僅是 V1 Demo infrastructure。正式串接時不得把真實密碼、Access Token 或機密資料沿用此方式保存。
+Production bundle 不包含 Mock database、Demo 帳密、資料重設功能或 sessionStorage 登入狀態。HTTP client 以 `credentials: include` 傳送 Cookie，但所有業務 API 仍以 Bearer Access Token 驗證。
 
-## 串接後端的架構變更
+## HTTP 邊界
 
-1. 保留 `contracts.ts` 與 View 呼叫方式。
-2. 依 `ApiList.md` 與正式 OpenAPI 實作 HTTP adapters。
-3. 新增 request／response DTO 與 mapper，不直接把 Backend DTO 當 ViewModel。
-4. 在應用程式組裝點注入 HTTP services，移除 production bundle 對 Mock repository 的依賴。
-5. 依後端驗證設計補上 Cookie／Token refresh、CSRF、401 retry 與 timeout。
-6. Contract tests 通過後，才移除 Demo-only `reset()` 與預設密碼提示。
+1. `contracts.ts` 維持 View 可依賴的穩定介面。
+2. `httpServices.ts` 將 API DTO 映射為前端 model，不讓 View 依賴 transport shape。
+3. `httpClient.ts` 統一處理 `/api/v1`、CSRF、Bearer、single-flight refresh、一次重送、timeout、取消與 Problem Details。
+4. Task／Comment request 明確傳遞 projectId、taskId 與 Base64 rowVersion。
+5. route guard 與按鈕只提供 UX 限制，Backend 仍逐次驗證 function 與資源範圍。

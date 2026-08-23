@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { services } from '@/services/mockServices'
+import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import type { Project } from '@/types/models'
@@ -89,7 +89,11 @@ async function logout() {
           </div>
         </div>
       </div>
-      <RouterLink :to="{ name: 'users' }" class="nav-button" @click="navigate"
+      <RouterLink
+        v-if="auth.hasFunction('accounts.read')"
+        :to="{ name: 'users' }"
+        class="nav-button"
+        @click="navigate"
         ><span class="nav-icon">♙</span><span>{{ t('nav.users') }}</span></RouterLink
       >
       <RouterLink :to="{ name: 'settings' }" class="nav-button" @click="navigate"

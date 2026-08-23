@@ -4,78 +4,94 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import { services } from '@/services/mockServices'
+import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
-import { ApiError, type Project, type ProjectRole, type User } from '@/types/models'
+import {
+  ApiError,
+  type MemberCandidate,
+  type Project,
+  type ProjectRoleOption,
+} from '@/types/models'
 
 const { t } = useI18n()
 const route = useRoute()
 const auth = useAuthStore()
 const ui = useUiStore()
 const project = ref<Project>()
-const users = ref<User[]>([])
+const candidates = ref<MemberCandidate[]>([])
+const roles = ref<ProjectRoleOption[]>([])
 const error = ref('')
 const selectedUser = ref('')
-const selectedRole = ref<ProjectRole>('Member')
-const roles: ProjectRole[] = [
-  'ProjectManager',
-  'FrontendDeveloper',
-  'BackendDeveloper',
-  'SystemAnalyst',
-  'Member',
-]
+const selectedRoleIds = ref<string[]>([])
 const canManage = computed(() => {
   const value = project.value
   const actor = auth.user
   return Boolean(
     value &&
     actor &&
-    (auth.isTaskAdministrator ||
-      value.ownerId === actor.id ||
-      value.members.some((m) => m.userId === actor.id && m.projectRole === 'ProjectManager')),
+    (auth.hasFunction('projects.manage-all') ||
+      value.members.some(
+        (member) =>
+          member.userId === actor.id && member.roles.some((role) => role.code === 'ProjectManager'),
+      )),
   )
 })
-const userById = (id: string) => users.value.find((user) => user.id === id)
+const ownerName = computed(
+  () =>
+    project.value?.members.find((member) => member.userId === project.value?.ownerId)?.displayName,
+)
 async function load() {
   try {
     project.value = await services.projects.get(String(route.params.projectId))
-    users.value = await services.users.list()
+    if (canManage.value) {
+      ;[candidates.value, roles.value] = await Promise.all([
+        services.projects.memberCandidates(project.value.id),
+        services.projects.roles(),
+      ])
+      if (!selectedRoleIds.value.length) {
+        const memberRole = roles.value.find((role) => role.code === 'Member')
+        if (memberRole) selectedRoleIds.value = [memberRole.id]
+      }
+    }
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Failed to load project'
   }
 }
 async function addMember() {
-  if (!project.value || !selectedUser.value) return
+  if (!project.value || !selectedUser.value || !selectedRoleIds.value.length) return
   try {
-    project.value = await services.projects.addMember(
-      project.value.id,
-      selectedUser.value,
-      selectedRole.value,
-    )
+    await services.projects.addMember(project.value.id, selectedUser.value, selectedRoleIds.value)
     selectedUser.value = ''
+    await load()
     ui.notify(t('message.saved'))
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Failed'
   }
 }
-async function changeRole(userId: string, event: Event) {
+async function changeRoles(userId: string, event: Event) {
   if (!project.value) return
-  project.value = await services.projects.updateMember(
-    project.value.id,
-    userId,
-    (event.target as HTMLSelectElement).value as ProjectRole,
+  const roleIds = [...(event.target as HTMLSelectElement).selectedOptions].map(
+    (option) => option.value,
   )
+  if (!roleIds.length) return
+  await services.projects.updateMember(project.value.id, userId, roleIds)
+  await load()
   ui.notify(t('message.saved'))
 }
 async function removeMember(userId: string) {
   if (
     !project.value ||
-    !confirm(t('message.confirmRemove', { name: userById(userId)?.displayName }))
+    !confirm(
+      t('message.confirmRemove', {
+        name: project.value.members.find((member) => member.userId === userId)?.displayName,
+      }),
+    )
   )
     return
   try {
-    project.value = await services.projects.removeMember(project.value.id, userId)
+    await services.projects.removeMember(project.value.id, userId)
+    await load()
     ui.notify(t('message.removed'))
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Failed'
@@ -87,7 +103,7 @@ onMounted(load)
   <div v-if="error" class="alert">{{ error }}</div>
   <div v-if="!project && !error" class="empty-state">{{ t('common.loading') }}</div>
   <template v-if="project"
-    ><PageHeader :eyebrow="project.id" :title="project.name" :description="project.description"
+    ><PageHeader :eyebrow="project.code" :title="project.name" :description="project.description"
       ><RouterLink class="button secondary" :to="{ name: 'projects' }">{{
         t('common.back')
       }}</RouterLink
@@ -109,21 +125,17 @@ onMounted(load)
               <label for="member">{{ t('user.name') }}</label
               ><select id="member" v-model="selectedUser" required>
                 <option value="">Select a user</option>
-                <option
-                  v-for="user in users.filter(
-                    (u) => u.isEnabled && !project?.members.some((m) => m.userId === u.id),
-                  )"
-                  :key="user.id"
-                  :value="user.id"
-                >
+                <option v-for="user in candidates" :key="user.id" :value="user.id">
                   {{ user.displayName }} ({{ user.account }})
                 </option>
               </select>
             </div>
             <div class="field">
               <label for="member-role">{{ t('project.role') }}</label
-              ><select id="member-role" v-model="selectedRole">
-                <option v-for="role in roles" :key="role">{{ role }}</option>
+              ><select id="member-role" v-model="selectedRoleIds" multiple required>
+                <option v-for="role in roles" :key="role.id" :value="role.id">
+                  {{ role.name }}
+                </option>
               </select>
             </div>
             <button class="button primary">{{ t('project.addMember') }}</button>
@@ -133,7 +145,6 @@ onMounted(load)
               <thead>
                 <tr>
                   <th>{{ t('user.name') }}</th>
-                  <th>{{ t('user.email') }}</th>
                   <th>{{ t('project.role') }}</th>
                   <th v-if="canManage">{{ t('common.actions') }}</th>
                 </tr>
@@ -141,18 +152,20 @@ onMounted(load)
               <tbody>
                 <tr v-for="member in project.members" :key="member.userId">
                   <td>
-                    <span class="table-title">{{ userById(member.userId)?.displayName }}</span
-                    ><span class="table-subtitle">{{ userById(member.userId)?.account }}</span>
+                    <span class="table-title">{{ member.displayName }}</span
+                    ><span class="table-subtitle">{{ member.account }}</span>
                   </td>
-                  <td>{{ userById(member.userId)?.email }}</td>
                   <td>
                     <select
                       v-if="canManage"
-                      :value="member.projectRole"
-                      @change="changeRole(member.userId, $event)"
+                      multiple
+                      :value="member.roles.map((role) => role.id)"
+                      @change="changeRoles(member.userId, $event)"
                     >
-                      <option v-for="role in roles" :key="role">{{ role }}</option></select
-                    ><span v-else>{{ member.projectRole }}</span>
+                      <option v-for="role in roles" :key="role.id" :value="role.id">
+                        {{ role.name }}
+                      </option></select
+                    ><span v-else>{{ member.roles.map((role) => role.name).join(', ') }}</span>
                   </td>
                   <td v-if="canManage">
                     <button
@@ -177,7 +190,7 @@ onMounted(load)
         <div class="card-body detail-list" style="grid-template-columns: 1fr">
           <div class="detail-item">
             <label>{{ t('project.owner') }}</label
-            ><strong>{{ userById(project.ownerId)?.displayName }}</strong>
+            ><strong>{{ ownerName }}</strong>
           </div>
           <div class="detail-item">
             <label>Created</label><span>{{ new Date(project.createdAt).toLocaleString() }}</span>
@@ -187,7 +200,7 @@ onMounted(load)
             ><span>{{ new Date(project.updatedAt).toLocaleString() }}</span>
           </div>
           <div class="detail-item">
-            <label>Version</label><span>v{{ project.version }}</span>
+            <label>Concurrency token</label><span>{{ project.rowVersion }}</span>
           </div>
           <RouterLink
             class="button primary"

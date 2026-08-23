@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import { services } from '@/services/mockServices'
+import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import {
@@ -15,7 +15,6 @@ import {
   type TaskItem,
   type TaskQuery,
   type TaskStatus,
-  type User,
   type UserPreference,
 } from '@/types/models'
 const { t } = useI18n()
@@ -25,8 +24,7 @@ const auth = useAuthStore()
 const ui = useUiStore()
 const projectId = String(route.params.projectId)
 const project = ref<Project>()
-const users = ref<User[]>([])
-const result = ref<PageResult<TaskItem>>({ items: [], page: 1, pageSize: 8, total: 0 })
+const result = ref<PageResult<TaskItem>>({ items: [], page: 1, pageSize: 8, totalCount: 0 })
 const loading = ref(true)
 const error = ref('')
 const selected = ref(new Set<string>())
@@ -42,11 +40,17 @@ const query = reactive<TaskQuery>({
   pageSize: 8,
 })
 const statuses: TaskStatus[] = ['Pending', 'InProgress', 'Blocked', 'Completed']
-const pages = computed(() => Math.max(1, Math.ceil(result.value.total / query.pageSize)))
-const canAdmin = computed(() => auth.isTaskAdministrator)
+const pages = computed(() => Math.max(1, Math.ceil(result.value.totalCount / query.pageSize)))
+const canAdmin = computed(() => auth.hasFunction('tasks.update-any'))
+const canCreate = computed(() => auth.hasFunction('tasks.create'))
 const canEdit = (task: TaskItem) =>
-  Boolean(auth.user && (canAdmin.value || task.assigneeId === auth.user.id))
-const userName = (id: string) => users.value.find((user) => user.id === id)?.displayName ?? id
+  Boolean(
+    auth.user &&
+    (canAdmin.value ||
+      (auth.hasFunction('tasks.update-assigned') && task.assigneeId === auth.user.id)),
+  )
+const userName = (id: string) =>
+  project.value?.members.find((member) => member.userId === id)?.displayName ?? id
 const editableOnPage = computed(() => result.value.items.filter(canEdit))
 const allSelected = computed(
   () =>
@@ -65,9 +69,8 @@ async function load() {
   }
 }
 async function initialLoad() {
-  ;[project.value, users.value, preference.value] = await Promise.all([
+  ;[project.value, preference.value] = await Promise.all([
     services.projects.get(projectId),
-    services.users.list(),
     services.preferences.get(),
   ])
   await load()
@@ -116,8 +119,8 @@ async function batchUpdate() {
   )
     return
   try {
-    const updatedCount = selected.value.size
-    await services.tasks.batchUpdate([...selected.value], targetStatus.value)
+    const tasks = result.value.items.filter((task) => selected.value.has(task.id))
+    const updatedCount = await services.tasks.batchUpdate(projectId, tasks, targetStatus.value)
     selected.value = new Set()
     ui.notify(t('message.updated', { count: updatedCount }))
     await load()
@@ -127,7 +130,7 @@ async function batchUpdate() {
 }
 async function removeTask(task: TaskItem) {
   if (!confirm(t('message.confirmRemove', { name: task.title }))) return
-  await services.tasks.remove(task.id)
+  await services.tasks.remove(projectId, task)
   ui.notify(t('message.removed'))
   await load()
 }
@@ -140,14 +143,14 @@ onMounted(initialLoad)
 </script>
 <template>
   <PageHeader
-    :eyebrow="project?.id"
+    :eyebrow="project?.code"
     :title="project?.name ?? t('task.title')"
     :description="t('task.title')"
     ><RouterLink class="button secondary" :to="{ name: 'project-detail', params: { projectId } }">{{
       t('project.detail')
     }}</RouterLink
     ><RouterLink
-      v-if="canAdmin"
+      v-if="canCreate"
       class="button primary"
       :to="{ name: 'task-new', params: { projectId } }"
       >＋ {{ t('task.new') }}</RouterLink
@@ -176,8 +179,8 @@ onMounted(initialLoad)
           <label for="task-assignee">{{ t('task.assignee') }}</label
           ><select id="task-assignee" v-model="query.assigneeId">
             <option value="">{{ t('common.all') }}</option>
-            <option v-for="user in users" :key="user.id" :value="user.id">
-              {{ user.displayName }}
+            <option v-for="member in project?.members" :key="member.userId" :value="member.userId">
+              {{ member.displayName }}
             </option>
           </select>
         </div>
@@ -245,7 +248,7 @@ onMounted(initialLoad)
                 @change="toggle(task.id)"
               />
             </td>
-            <td>{{ task.id }}</td>
+            <td>{{ task.code }}</td>
             <td>
               <RouterLink
                 class="table-title"
@@ -291,7 +294,7 @@ onMounted(initialLoad)
       </table>
     </div>
     <div class="pagination">
-      <span>{{ result.total }} tasks · {{ query.page }}/{{ pages }}</span
+      <span>{{ result.totalCount }} tasks · {{ query.page }}/{{ pages }}</span
       ><button class="button secondary" :disabled="query.page <= 1" @click="changePage(-1)">
         {{ t('common.previous') }}</button
       ><button class="button secondary" :disabled="query.page >= pages" @click="changePage(1)">

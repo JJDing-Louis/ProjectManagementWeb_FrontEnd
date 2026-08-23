@@ -55,7 +55,7 @@ const routes: RouteRecordRaw[] = [
         path: 'admin/projects/new',
         name: 'project-new',
         component: () => import('@/views/projects/ProjectFormView.vue'),
-        meta: { taskAdmin: true },
+        meta: { requiredFunction: 'projects.create' },
       },
       {
         path: 'admin/projects/:projectId/edit',
@@ -66,18 +66,24 @@ const routes: RouteRecordRaw[] = [
         path: 'admin/projects/:projectId/task-items/new',
         name: 'task-new',
         component: () => import('@/views/tasks/TaskFormView.vue'),
-        meta: { taskAdmin: true },
+        meta: { requiredFunction: 'tasks.create' },
       },
       {
         path: 'admin/projects/:projectId/task-items/:taskId/edit',
         name: 'task-edit',
         component: () => import('@/views/tasks/TaskFormView.vue'),
       },
-      { path: 'users', name: 'users', component: () => import('@/views/users/UserListView.vue') },
+      {
+        path: 'users',
+        name: 'users',
+        component: () => import('@/views/users/UserListView.vue'),
+        meta: { requiredFunction: 'accounts.read' },
+      },
       {
         path: 'users/:userId',
         name: 'user-detail',
         component: () => import('@/views/users/UserDetailView.vue'),
+        meta: { requiredFunction: 'accounts.read' },
       },
       { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
       {
@@ -108,6 +114,8 @@ router.beforeEach(async (to) => {
     return { name: 'sign-in', query: { redirect: to.fullPath } }
   if (to.meta.public && auth.isAuthenticated && ['sign-in', 'sign-up'].includes(String(to.name)))
     return { name: 'projects' }
-  if (to.meta.taskAdmin && !auth.isTaskAdministrator) return { name: 'forbidden' }
+  if (to.meta.requiredFunction && !auth.hasFunction(String(to.meta.requiredFunction))) {
+    return { name: 'forbidden' }
+  }
   return true
 })

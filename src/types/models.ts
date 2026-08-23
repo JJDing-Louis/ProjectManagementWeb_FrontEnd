@@ -1,6 +1,7 @@
 export type SystemRole = 'Admin' | 'Administrator' | 'User' | 'Viewer'
-export type ProjectRole =
+export type ProjectRoleCode =
   'ProjectManager' | 'FrontendDeveloper' | 'BackendDeveloper' | 'SystemAnalyst' | 'Member'
+export type ProjectStatus = 'Pending' | 'Active' | 'Completed' | 'Archived'
 export type TaskStatus = 'Pending' | 'InProgress' | 'Blocked' | 'Completed'
 
 export interface User {
@@ -11,28 +12,53 @@ export interface User {
   role: SystemRole
   isVerified: boolean
   isEnabled: boolean
-  createdAt: string
+}
+
+export interface CurrentUser extends User {
+  functions: string[]
+}
+
+export interface RoleOption {
+  id: string
+  name: SystemRole
+  functions: string[]
+}
+
+export interface ProjectRoleOption {
+  id: string
+  code: ProjectRoleCode
+  name: string
 }
 
 export interface ProjectMember {
   userId: string
-  projectRole: ProjectRole
+  account: string
+  displayName: string
+  roles: ProjectRoleOption[]
+}
+
+export interface MemberCandidate {
+  id: string
+  account: string
+  displayName: string
 }
 
 export interface Project {
   id: string
+  code: string
   name: string
   description: string
   ownerId: string
-  status: 'Active' | 'Archived'
+  status: ProjectStatus
   createdAt: string
   updatedAt: string
-  version: number
+  rowVersion: string
   members: ProjectMember[]
 }
 
 export interface TaskItem {
   id: string
+  code: string
   projectId: string
   title: string
   description: string
@@ -43,8 +69,7 @@ export interface TaskItem {
   status: TaskStatus
   createdAt: string
   updatedAt: string
-  version: number
-  deletedAt: string | null
+  rowVersion: string
 }
 
 export interface TaskComment {
@@ -54,11 +79,10 @@ export interface TaskComment {
   content: string
   createdAt: string
   updatedAt: string
-  deletedAt: string | null
+  rowVersion: string
 }
 
 export interface UserPreference {
-  userId: string
   skipBatchConfirmation: boolean
 }
 
@@ -66,7 +90,7 @@ export interface PageResult<T> {
   items: T[]
   page: number
   pageSize: number
-  total: number
+  totalCount: number
 }
 
 export class ApiError extends Error {
@@ -74,15 +98,24 @@ export class ApiError extends Error {
     public readonly status: number,
     message: string,
     public readonly fieldErrors: Record<string, string> = {},
+    public readonly code?: string,
+    public readonly traceId?: string,
   ) {
     super(message)
     this.name = 'ApiError'
   }
 }
 
+export interface UserQuery {
+  search: string
+  role: '' | SystemRole
+  page: number
+  pageSize: number
+}
+
 export interface ProjectQuery {
   search: string
-  status: '' | Project['status']
+  status: '' | ProjectStatus
   page: number
   pageSize: number
 }
@@ -101,8 +134,8 @@ export interface ProjectInput {
   name: string
   description: string
   ownerId: string
-  status: Project['status']
-  version?: number | undefined
+  status: ProjectStatus
+  rowVersion?: string | undefined
 }
 
 export interface TaskInput {
@@ -112,5 +145,5 @@ export interface TaskInput {
   startAt: string
   deadline: string
   status: TaskStatus
-  version?: number | undefined
+  rowVersion?: string | undefined
 }

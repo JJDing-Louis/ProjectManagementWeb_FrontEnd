@@ -3,10 +3,10 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
-import { services } from '@/services/mockServices'
+import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
-import { ApiError, type Project, type TaskStatus, type User } from '@/types/models'
+import { ApiError, type Project, type TaskStatus } from '@/types/models'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
@@ -16,7 +16,6 @@ const projectId = String(route.params.projectId)
 const taskId = computed(() => String(route.params.taskId ?? ''))
 const editing = computed(() => Boolean(taskId.value))
 const project = ref<Project>()
-const users = ref<User[]>([])
 const error = ref('')
 const statuses: TaskStatus[] = ['Pending', 'InProgress', 'Blocked', 'Completed']
 const form = reactive({
@@ -26,17 +25,14 @@ const form = reactive({
   startAt: '',
   deadline: '',
   status: 'Pending' as TaskStatus,
-  version: undefined as number | undefined,
+  rowVersion: undefined as string | undefined,
 })
 const fullEdit = computed(() => auth.isTaskAdministrator)
 const toLocal = (value: string) => value.slice(0, 16)
 onMounted(async () => {
-  ;[project.value, users.value] = await Promise.all([
-    services.projects.get(projectId),
-    services.users.list(),
-  ])
+  project.value = await services.projects.get(projectId)
   if (editing.value) {
-    const task = await services.tasks.get(taskId.value)
+    const task = await services.tasks.get(projectId, taskId.value)
     Object.assign(form, {
       title: task.title,
       description: task.description,
@@ -44,7 +40,7 @@ onMounted(async () => {
       startAt: toLocal(task.startAt),
       deadline: toLocal(task.deadline),
       status: task.status,
-      version: task.version,
+      rowVersion: task.rowVersion,
     })
   }
 })
@@ -56,9 +52,11 @@ async function submit() {
       startAt: new Date(form.startAt).toISOString(),
       deadline: new Date(form.deadline).toISOString(),
     }
-    const saved = editing.value
-      ? await services.tasks.update(taskId.value, input)
-      : await services.tasks.create(projectId, input)
+    const saved = !editing.value
+      ? await services.tasks.create(projectId, input)
+      : fullEdit.value
+        ? await services.tasks.update(projectId, taskId.value, input)
+        : await services.tasks.updateAssigned(projectId, taskId.value, input)
     ui.notify(t('message.saved'))
     await router.push({ name: 'task-detail', params: { projectId, taskId: saved.id } })
   } catch (reason) {
@@ -102,7 +100,7 @@ async function submit() {
                 :key="member.userId"
                 :value="member.userId"
               >
-                {{ users.find((u) => u.id === member.userId)?.displayName }}
+                {{ member.displayName }}
               </option>
             </select>
           </div>

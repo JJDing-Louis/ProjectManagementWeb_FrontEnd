@@ -4,10 +4,10 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import { services } from '@/services/mockServices'
+import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
-import { ApiError, type SystemRole, type User } from '@/types/models'
+import { ApiError, type RoleOption, type User } from '@/types/models'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
@@ -15,12 +15,15 @@ const auth = useAuthStore()
 const ui = useUiStore()
 const user = ref<User>()
 const error = ref('')
-const form = reactive({ role: 'Viewer' as SystemRole, isEnabled: true })
-const roles: SystemRole[] = ['Admin', 'Administrator', 'User', 'Viewer']
+const form = reactive({ roleId: '', isEnabled: true })
+const roles = ref<RoleOption[]>([])
 onMounted(async () => {
   try {
-    user.value = await services.users.get(String(route.params.userId))
-    form.role = user.value.role
+    ;[user.value, roles.value] = await Promise.all([
+      services.users.get(String(route.params.userId)),
+      services.users.roles(),
+    ])
+    form.roleId = roles.value.find((role) => role.name === user.value?.role)?.id ?? ''
     form.isEnabled = user.value.isEnabled
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Load failed'
@@ -29,7 +32,11 @@ onMounted(async () => {
 async function save() {
   if (!user.value) return
   try {
-    user.value = await services.users.update(user.value.id, form.role, form.isEnabled)
+    user.value = await services.users.updateAdministration(
+      user.value.id,
+      form.roleId,
+      form.isEnabled,
+    )
     ui.notify(t('message.saved'))
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Save failed'
@@ -64,9 +71,6 @@ async function save() {
             <label>{{ t('user.verified') }}</label
             ><span>{{ user.isVerified ? 'Yes' : 'No' }}</span>
           </div>
-          <div class="detail-item">
-            <label>Created</label><span>{{ new Date(user.createdAt).toLocaleString() }}</span>
-          </div>
         </div>
       </section>
       <aside class="card">
@@ -75,8 +79,10 @@ async function save() {
           <form v-if="auth.isAdmin" @submit.prevent="save">
             <div class="field">
               <label for="role">{{ t('user.role') }}</label
-              ><select id="role" v-model="form.role">
-                <option v-for="role in roles" :key="role">{{ role }}</option>
+              ><select id="role" v-model="form.roleId" required>
+                <option v-for="role in roles" :key="role.id" :value="role.id">
+                  {{ role.name }}
+                </option>
               </select>
             </div>
             <label class="check-field"

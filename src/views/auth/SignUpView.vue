@@ -3,7 +3,7 @@ import { reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import AuthLayout from '@/layouts/AuthLayout.vue'
-import { services } from '@/services/mockServices'
+import { services } from '@/services'
 import { ApiError } from '@/types/models'
 
 const { t } = useI18n()
@@ -26,8 +26,8 @@ async function submit() {
     return
   }
   try {
-    await services.auth.signUp(form)
-    await router.push({ name: 'verify-email', query: { account: form.account } })
+    const accountId = await services.auth.signUp(form)
+    await router.push({ name: 'verify-email', query: { accountId } })
   } catch (reason) {
     if (reason instanceof ApiError) {
       error.value = reason.message
@@ -67,7 +67,7 @@ async function submit() {
       <div class="form-grid">
         <div class="field">
           <label for="password">{{ t('auth.password') }}</label
-          ><input id="password" v-model="form.password" type="password" minlength="8" required />
+          ><input id="password" v-model="form.password" type="password" minlength="10" required />
         </div>
         <div class="field">
           <label for="confirmPassword">{{ t('auth.confirmPassword') }}</label

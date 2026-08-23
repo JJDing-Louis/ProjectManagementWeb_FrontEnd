@@ -10,8 +10,8 @@ const { t } = useI18n()
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
-const account = ref('admin')
-const password = ref('Demo123!')
+const account = ref('')
+const password = ref('')
 const error = ref('')
 const submitting = ref(false)
 
@@ -58,9 +58,5 @@ async function submit() {
       <RouterLink class="link" to="/sign-up">{{ t('auth.signUp') }}</RouterLink> ·
       <RouterLink class="link" to="/resend-verification">{{ t('auth.resend') }}</RouterLink>
     </p>
-    <div class="demo-box">
-      <strong>{{ t('auth.demo') }}</strong
-      ><br />admin · administrator · user · viewer · pending<br />Password: <code>Demo123!</code>
-    </div>
   </AuthLayout>
 </template>

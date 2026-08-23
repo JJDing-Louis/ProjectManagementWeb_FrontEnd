@@ -1,6 +1,6 @@
 # ProjectManagementWeb Frontend
 
-ProjectManagementWeb 是以 Vue 3、TypeScript 與 Vite 建立的前後端分離專案管理 SPA。V1 已完成桌面優先的 RWD 介面、角色權限、專案與 Task 工作流程；目前資料來源是 typed Mock services 與瀏覽器 Storage，尚未連接正式 Backend API。
+ProjectManagementWeb 是以 Vue 3、TypeScript 與 Vite 建立的前後端分離專案管理 SPA。前端已透過 typed HTTP services 串接 ASP.NET Core `/api/v1`，涵蓋驗證、角色權限、Project、Task、留言、偏好與帳號管理流程。
 
 ## V1 功能
 
@@ -36,12 +36,12 @@ Vue Views / Pinia Stores
         ↓
 Typed Service Interfaces
         ↓
-Mock Service Adapter（目前）
+HTTP Service Adapters + DTO Mappers
         ↓
-localStorage / sessionStorage
+ASP.NET Core `/api/v1`
 ```
 
-View 不直接讀寫 Storage。未來串接 Backend 時，應以 HTTP adapter 替換 Mock adapter，並保留既有 service interfaces 與 View 呼叫方式。
+View 不直接呼叫 `fetch`。Access Token 僅保存在記憶體，Refresh Token 由後端透過 HttpOnly Cookie 管理；共用 client 統一處理 CSRF、single-flight refresh、timeout 與 Problem Details。
 
 詳細架構、API 清單與資料契約：
 
@@ -57,14 +57,14 @@ src/
 ├── components/      # 共用 UI 元件與 Sidebar
 ├── layouts/         # Auth 與登入後 App shell
 ├── router/          # Routes 與 navigation guards
-├── services/        # Contracts、Mock adapter 與 seed data
+├── services/        # Contracts、HTTP client、adapters 與 DTO mappers
 ├── stores/          # Auth 與全域 UI state
 ├── types/           # Domain models、query、input、ApiError
 └── views/           # Auth、Project、Task、User 與 Settings 頁面
 tests/
 ├── e2e/             # Playwright acceptance tests
 ├── components.spec.ts
-├── mockServices.spec.ts
+├── mockServices.spec.ts # HTTP client／adapter 測試
 └── router.spec.ts
 docs/                # 架構與前後端串接文件
 ```
@@ -79,31 +79,24 @@ docs/                # 架構與前後端串接文件
 
 ```bash
 npm install
+```
+
+先複製環境設定並確認 Backend 已啟動：
+
+```bash
+cp .env.example .env.local
 npm run dev
 ```
 
-Vite 啟動後依終端輸出的 Local URL 開啟網站。
+`VITE_API_BASE_URL` 應填 Backend origin，例如 `http://localhost:8080`；client 會統一加上 `/api/v1`。Vite 啟動後依終端輸出的 Local URL 開啟網站。
 
-## 示範帳號
+## 驗證與 Session
 
-| Account         | Role          | Email verified |
-| --------------- | ------------- | -------------- |
-| `admin`         | Admin         | Yes            |
-| `administrator` | Administrator | Yes            |
-| `user`          | User          | Yes            |
-| `viewer`        | Viewer        | Yes            |
-| `pending`       | Viewer        | No             |
-
-所有示範帳號密碼皆為 `Demo123!`。這些帳號只存在於 Mock demo；正式串接後必須從 production bundle 移除。
-
-## Mock Storage
-
-| Storage        | 用途                     |
-| -------------- | ------------------------ |
-| localStorage   | Mock database 與介面語言 |
-| sessionStorage | 目前 Mock 登入使用者 ID  |
-
-可在 Settings 重設示範資料。此功能與 Storage key 都不是正式 Backend contract。
+- 登入後 Access Token 只存在記憶體，不寫入 localStorage 或 sessionStorage。
+- Refresh Token 是 `PMW-REFRESH` HttpOnly Cookie，JavaScript 無法讀取。
+- Auth POST 會先取得 CSRF token 並附加 `X-CSRF-TOKEN`。
+- 頁面重新整理時先 refresh，再呼叫 `/auth/me` 恢復使用者。
+- 401 只會 single-flight refresh，原請求最多重送一次；refresh 失敗即清除登入狀態。
 
 ## 常用指令
 
@@ -129,32 +122,29 @@ npm run build
 npm run preview
 ```
 
-## 串接 Backend
+## Backend 契約
 
-1. 先由前後端共同確認 [BackendContract.md](docs/BackendContract.md) 的待確認事項。
-2. 以正式 OpenAPI schema 建立 request／response DTO 與 mapper。
-3. 實作 `AuthService`、`UserService`、`ProjectService`、`TaskItemService`、`PreferenceService` 的 HTTP adapters。
-4. 在應用程式組裝點替換 Mock services，不在 Vue component 中散落 HTTP 呼叫。
-5. 補上驗證 transport、401、CSRF、timeout、request cancellation 與 contract tests。
-6. 移除 production bundle 中的 Demo 帳密、Mock reset 與 Mock repository。
+- API base path：`/api/v1`。
+- Project／Task 的 `code` 為唯讀，由後端依 UTC 日期產生 `PRJ-YYYYMMDD######`／`TASK-YYYYMMDD######`。
+- 路由與 API 使用 GUID；畫面顯示業務編號。
+- Project、Task、Comment 更新與刪除傳送 Base64 `rowVersion`。
+- 分頁回應使用 `totalCount`。
+- Project member 支援多重 `roles`，候選人由專案範圍 API 載入。
 
 ## 最近驗證狀態
 
-V1 程式碼曾完成以下驗證：
+目前程式碼已完成以下驗證：
 
 - Prettier format check。
 - ESLint。
 - vue-tsc strict type check。
 - Vitest：7 個測試通過。
-- Playwright：桌面與手機主要流程通過；裝置限定案例在不適用的 project 正常略過。
+- Playwright 串接實際 Backend：7 個通過，3 個因裝置不適用而略過。
 - Vite production build。
-- 1440px 桌面與 390px 手機視覺檢查，browser console 無 error。
-
-文件更新後仍應重新執行與變更風險相稱的檢查；不可只依賴上述歷史結果。
+- 實際驗證登入／refresh cookie、Project 與 Task 自動編號、桌面與手機主要流程。
 
 ## 已知邊界
 
-- 尚未串接 ASP.NET Core Backend 或真實 Email service。
-- Mock 權限只用於 UX 與流程展示，不是正式安全邊界。
-- Backend API path、驗證方式、Task 狀態轉換與時區規則仍待確認。
-- `displayName` 是目前前端必要欄位，但既有 Database Schema 尚缺少對應欄位。
+- Email 驗證的 token 與確認 API 流程已串接；實際寄信仍取決於 Backend SMTP secret 與外部郵件服務。
+- 前端權限顯示來自 `/auth/me.functions` 與專案角色，但正式安全邊界仍由 Backend 強制執行。
+- E2E 需先啟動 SQL Server 與 Backend，並透過 `PMW_E2E_PASSWORD` 提供測試 Admin 密碼。

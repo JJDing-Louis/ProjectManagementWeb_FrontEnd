@@ -4,17 +4,17 @@ import { useI18n } from 'vue-i18n'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import { services } from '@/services/mockServices'
+import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
 import type { PageResult, Project, ProjectQuery } from '@/types/models'
 
 const { t } = useI18n()
 const auth = useAuthStore()
 const query = reactive<ProjectQuery>({ search: '', status: '', page: 1, pageSize: 6 })
-const result = ref<PageResult<Project>>({ items: [], page: 1, pageSize: 6, total: 0 })
+const result = ref<PageResult<Project>>({ items: [], page: 1, pageSize: 6, totalCount: 0 })
 const loading = ref(true)
-const canCreate = computed(() => auth.isTaskAdministrator)
-const pages = computed(() => Math.max(1, Math.ceil(result.value.total / query.pageSize)))
+const canCreate = computed(() => auth.hasFunction('projects.create'))
+const pages = computed(() => Math.max(1, Math.ceil(result.value.totalCount / query.pageSize)))
 async function load() {
   loading.value = true
   result.value = await services.projects.list(query)
@@ -57,7 +57,9 @@ onMounted(load)
           <label for="project-status">{{ t('common.status') }}</label
           ><select id="project-status" v-model="query.status">
             <option value="">{{ t('common.all') }}</option>
+            <option value="Pending">Pending</option>
             <option value="Active">Active</option>
+            <option value="Completed">Completed</option>
             <option value="Archived">Archived</option>
           </select>
         </div>
@@ -83,7 +85,7 @@ onMounted(load)
         <tbody>
           <tr v-for="project in result.items" :key="project.id">
             <td>
-              <span class="table-title">{{ project.id }}</span>
+              <span class="table-title">{{ project.code }}</span>
             </td>
             <td>
               <span class="table-title">{{ project.name }}</span
@@ -109,7 +111,7 @@ onMounted(load)
       </table>
     </div>
     <div class="pagination">
-      <span>{{ result.total }} projects · {{ query.page }}/{{ pages }}</span
+      <span>{{ result.totalCount }} projects · {{ query.page }}/{{ pages }}</span
       ><button class="button secondary" :disabled="query.page <= 1" @click="changePage(-1)">
         {{ t('common.previous') }}</button
       ><button class="button secondary" :disabled="query.page >= pages" @click="changePage(1)">

@@ -3,35 +3,42 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
-import { services } from '@/services/mockServices'
+import { services } from '@/services'
 import { useUiStore } from '@/stores/ui'
-import { ApiError, type User } from '@/types/models'
+import { ApiError, type ProjectStatus } from '@/types/models'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
 const id = computed(() => String(route.params.projectId ?? ''))
 const editing = computed(() => Boolean(id.value))
-const users = ref<User[]>([])
+const owners = ref<Array<{ id: string; displayName: string }>>([])
 const error = ref('')
 const form = reactive({
   name: '',
   description: '',
   ownerId: '',
-  status: 'Active' as 'Active' | 'Archived',
-  version: undefined as number | undefined,
+  status: 'Active' as ProjectStatus,
+  rowVersion: undefined as string | undefined,
 })
 onMounted(async () => {
-  users.value = await services.users.list()
   if (editing.value) {
     const project = await services.projects.get(id.value)
+    owners.value = project.members.map((member) => ({
+      id: member.userId,
+      displayName: member.displayName,
+    }))
     Object.assign(form, {
       name: project.name,
       description: project.description,
       ownerId: project.ownerId,
       status: project.status,
-      version: project.version,
+      rowVersion: project.rowVersion,
     })
+  } else {
+    owners.value = (await services.users.listAll())
+      .filter((user) => user.isEnabled)
+      .map((user) => ({ id: user.id, displayName: user.displayName }))
   }
 })
 async function submit() {
@@ -72,11 +79,7 @@ async function submit() {
             <label for="project-owner">{{ t('project.owner') }}</label
             ><select id="project-owner" v-model="form.ownerId" required>
               <option value="">Select owner</option>
-              <option
-                v-for="user in users.filter((u) => u.isEnabled)"
-                :key="user.id"
-                :value="user.id"
-              >
+              <option v-for="user in owners" :key="user.id" :value="user.id">
                 {{ user.displayName }}
               </option>
             </select>
@@ -85,6 +88,8 @@ async function submit() {
             <label for="project-form-status">{{ t('common.status') }}</label
             ><select id="project-form-status" v-model="form.status">
               <option>Active</option>
+              <option>Pending</option>
+              <option>Completed</option>
               <option>Archived</option>
             </select>
           </div>
