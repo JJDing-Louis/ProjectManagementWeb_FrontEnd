@@ -125,7 +125,7 @@ onMounted(load)
   <div v-if="error" class="alert">{{ error }}</div>
   <div v-if="!project && !error" class="empty-state">{{ t('common.loading') }}</div>
   <template v-if="project"
-    ><PageHeader :eyebrow="project.code" :title="project.name" :description="project.description"
+    ><PageHeader :eyebrow="project.code" :title="project.name"
       ><RouterLink class="button secondary" :to="{ name: 'projects' }">{{
         t('common.back')
       }}</RouterLink
@@ -137,79 +137,96 @@ onMounted(load)
       ></PageHeader
     >
     <div class="detail-grid">
-      <section class="card">
-        <div class="card-header">
-          <h2>{{ t('project.members') }}</h2>
-        </div>
-        <div class="card-body">
-          <form v-if="canManage" class="toolbar" @submit.prevent="addMember">
-            <div class="field grow">
-              <label for="member">{{ t('user.name') }}</label
-              ><select id="member" v-model="selectedUser" required>
-                <option value="">Select a user</option>
-                <option v-for="user in candidates" :key="user.id" :value="user.id">
-                  {{ user.displayName }} ({{ user.account }})
-                </option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="member-role">{{ t('project.role') }}</label>
-              <MultiSelectDropdown
-                v-model="selectedRoleIds"
-                input-id="member-role"
-                :accessible-label="t('project.role')"
-                :options="roles"
-                :placeholder="t('project.selectRole')"
-                required
-              />
-            </div>
-            <button class="button primary" :disabled="!selectedUser || !selectedRoleIds.length">
-              {{ t('project.addMember') }}
-            </button>
-          </form>
-          <div class="table-wrap">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>{{ t('user.name') }}</th>
-                  <th>{{ t('project.role') }}</th>
-                  <th v-if="canManage">{{ t('common.actions') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="member in project.members" :key="member.userId">
-                  <td>
-                    <span class="table-title">{{ member.displayName }}</span
-                    ><span class="table-subtitle">{{ member.account }}</span>
-                  </td>
-                  <td>
-                    <MultiSelectDropdown
-                      v-if="canManage"
-                      :model-value="memberRoleSelections[member.userId] ?? []"
-                      :input-id="`member-roles-${member.userId}`"
-                      :accessible-label="`${member.displayName} ${t('project.role')}`"
-                      :options="roles"
-                      :placeholder="t('project.selectRole')"
-                      :disabled="savingMemberIds.has(member.userId)"
-                      required
-                      @update:model-value="changeRoles(member.userId, $event)"
-                    />
-                    <span v-else>{{ member.roles.map((role) => role.name).join(', ') }}</span>
-                  </td>
-                  <td v-if="canManage">
-                    <button
-                      class="button danger"
-                      :disabled="member.userId === project.ownerId"
-                      @click="removeMember(member.userId)"
-                    >
-                      {{ t('common.remove') }}
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+      <section class="card project-content-card">
+        <section class="project-content-section" aria-labelledby="project-description-heading">
+          <div class="card-header">
+            <h2 id="project-description-heading">{{ t('project.description') }}</h2>
           </div>
-        </div>
+          <div class="card-body project-description">
+            <p>{{ project.description || '—' }}</p>
+          </div>
+        </section>
+        <section class="project-content-section" aria-labelledby="project-member-heading">
+          <div class="card-header">
+            <h2 id="project-member-heading">{{ t('project.members') }}</h2>
+          </div>
+          <div class="card-body">
+            <form v-if="canManage" class="toolbar" @submit.prevent="addMember">
+              <div class="field grow">
+                <label for="member">{{ t('user.name') }}</label
+                ><select id="member" v-model="selectedUser" required>
+                  <option value="">Select a user</option>
+                  <option v-for="user in candidates" :key="user.id" :value="user.id">
+                    {{ user.displayName }} ({{ user.account }})
+                  </option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="member-role">{{ t('project.role') }}</label>
+                <MultiSelectDropdown
+                  v-model="selectedRoleIds"
+                  input-id="member-role"
+                  :accessible-label="t('project.role')"
+                  :options="roles"
+                  :placeholder="t('project.selectRole')"
+                  required
+                />
+              </div>
+              <button class="button primary" :disabled="!selectedUser || !selectedRoleIds.length">
+                {{ t('project.addMember') }}
+              </button>
+            </form>
+            <div class="table-wrap">
+              <table class="data-table member-table">
+                <colgroup>
+                  <col class="member-name-column" />
+                  <col class="member-role-column" />
+                  <col v-if="canManage" class="member-action-column" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>{{ t('user.name') }}</th>
+                    <th>{{ t('project.role') }}</th>
+                    <th v-if="canManage" class="member-action-cell">
+                      {{ t('common.actions') }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="member in project.members" :key="member.userId">
+                    <td class="member-role-cell">
+                      <span class="table-title">{{ member.displayName }}</span
+                      ><span class="table-subtitle">{{ member.account }}</span>
+                    </td>
+                    <td>
+                      <MultiSelectDropdown
+                        v-if="canManage"
+                        :model-value="memberRoleSelections[member.userId] ?? []"
+                        :input-id="`member-roles-${member.userId}`"
+                        :accessible-label="`${member.displayName} ${t('project.role')}`"
+                        :options="roles"
+                        :placeholder="t('project.selectRole')"
+                        :disabled="savingMemberIds.has(member.userId)"
+                        required
+                        @update:model-value="changeRoles(member.userId, $event)"
+                      />
+                      <span v-else>{{ member.roles.map((role) => role.name).join(', ') }}</span>
+                    </td>
+                    <td v-if="canManage" class="member-action-cell">
+                      <button
+                        class="button danger"
+                        :disabled="member.userId === project.ownerId"
+                        @click="removeMember(member.userId)"
+                      >
+                        {{ t('common.remove') }}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       </section>
       <aside class="card">
         <div class="card-header">
@@ -241,3 +258,46 @@ onMounted(load)
     </div>
   </template>
 </template>
+
+<style scoped>
+.project-content-section + .project-content-section .card-header {
+  border-top: 1px solid var(--slate-200);
+}
+
+.project-description p {
+  margin: 0;
+  color: var(--slate-700);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.member-table {
+  min-width: 640px;
+  table-layout: fixed;
+}
+
+.member-name-column {
+  width: 24%;
+}
+
+.member-role-column {
+  width: 56%;
+}
+
+.member-action-column {
+  width: 20%;
+}
+
+.member-role-cell {
+  overflow: hidden;
+}
+
+.member-role-cell :deep(.multi-select) {
+  width: 100%;
+  min-width: 0;
+}
+
+.member-action-cell {
+  white-space: nowrap;
+}
+</style>

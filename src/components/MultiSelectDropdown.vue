@@ -175,6 +175,7 @@ onBeforeUnmount(() => {
 }
 
 .multi-select-trigger > span:first-child {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

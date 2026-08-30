@@ -110,4 +110,26 @@ describe('ProjectDetailView', () => {
       'frontend',
     ])
   })
+
+  it('白色內容卡片依序顯示 Description 與 Member 兩個區段', async () => {
+    const wrapper = await mountView()
+    const contentCard = wrapper.get('.project-content-card')
+    const sections = contentCard.findAll('.project-content-section')
+
+    expect(wrapper.find('.page-header p').exists()).toBe(false)
+    expect(sections).toHaveLength(2)
+    expect(sections[0]?.get('h2').text()).toBe('說明')
+    expect(sections[0]?.text()).toContain(project.description)
+    expect(sections[1]?.get('h2').text()).toBe('成員')
+  })
+
+  it('成員表格為 Action 保留獨立欄寬', async () => {
+    const wrapper = await mountView()
+    const memberTable = wrapper.get('.member-table')
+
+    expect(memberTable.findAll('col')).toHaveLength(3)
+    expect(memberTable.find('col.member-role-column').exists()).toBe(true)
+    expect(memberTable.find('col.member-action-column').exists()).toBe(true)
+    expect(memberTable.get('th.member-action-cell').text()).toBe('操作')
+  })
 })
