@@ -209,13 +209,13 @@ export const services: AppServices = {
       return this.currentUser()
     },
     async signUp(input) {
-      const result = await authRequest<{ accountId: string }>('/auth/register', {
+      return authRequest<{ accountId: string; verificationEmailSent: boolean }>('/auth/register', {
         account: input.account,
         password: input.password,
+        confirmPassword: input.confirmPassword,
         email: input.email,
         name: input.displayName,
       })
-      return result.accountId
     },
     async signOut() {
       try {

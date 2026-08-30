@@ -21,14 +21,20 @@ export interface RegisterInput {
   account: string
   displayName: string
   password: string
+  confirmPassword: string
   email: string
+}
+
+export interface RegistrationResult {
+  accountId: string
+  verificationEmailSent: boolean
 }
 
 export interface AuthService {
   restore(): Promise<CurrentUser | null>
   currentUser(): Promise<CurrentUser>
   signIn(account: string, password: string): Promise<CurrentUser>
-  signUp(input: RegisterInput): Promise<string>
+  signUp(input: RegisterInput): Promise<RegistrationResult>
   signOut(): Promise<void>
   verifyEmail(accountId: string, token: string): Promise<void>
   resendVerification(accountOrEmail: string): Promise<void>

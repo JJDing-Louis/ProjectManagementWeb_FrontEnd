@@ -2,6 +2,7 @@
 import { reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { mapRegistrationFieldErrors } from '@/features/auth/registrationErrors'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import { services } from '@/services'
 import { ApiError } from '@/types/models'
@@ -17,22 +18,31 @@ const form = reactive({
 })
 const error = ref('')
 const fieldErrors = ref<Record<string, string>>({})
+const submitting = ref(false)
 
 async function submit() {
   error.value = ''
   fieldErrors.value = {}
-  if (form.password !== form.confirmPassword) {
-    fieldErrors.value.confirmPassword = 'Passwords do not match'
-    return
-  }
+  if (submitting.value) return
+  submitting.value = true
   try {
-    const accountId = await services.auth.signUp(form)
-    await router.push({ name: 'verify-email', query: { accountId } })
+    const result = await services.auth.signUp(form)
+    await router.push({
+      name: 'verify-email',
+      query: {
+        accountId: result.accountId,
+        emailSent: String(result.verificationEmailSent),
+      },
+    })
   } catch (reason) {
     if (reason instanceof ApiError) {
       error.value = reason.message
-      fieldErrors.value = reason.fieldErrors
+      fieldErrors.value = mapRegistrationFieldErrors(reason.fieldErrors)
+    } else {
+      error.value = '註冊失敗，請稍後再試。'
     }
+  } finally {
+    submitting.value = false
   }
 }
 </script>
@@ -42,8 +52,8 @@ async function submit() {
     <span class="eyebrow">ProjectManagementWeb</span>
     <h2>{{ t('auth.signUp') }}</h2>
     <p>Create a Viewer account and verify your email later.</p>
-    <div v-if="error" class="alert">{{ error }}</div>
-    <form @submit.prevent="submit">
+    <div v-if="error" class="alert" role="alert">{{ error }}</div>
+    <form novalidate @submit.prevent="submit">
       <div class="field">
         <label for="account">{{ t('auth.account') }}</label
         ><input id="account" v-model.trim="form.account" required /><span
@@ -54,7 +64,11 @@ async function submit() {
       </div>
       <div class="field">
         <label for="displayName">{{ t('auth.displayName') }}</label
-        ><input id="displayName" v-model.trim="form.displayName" required />
+        ><input id="displayName" v-model.trim="form.displayName" required /><span
+          v-if="fieldErrors.displayName"
+          class="field-error"
+          >{{ fieldErrors.displayName }}</span
+        >
       </div>
       <div class="field">
         <label for="email">{{ t('auth.email') }}</label
@@ -67,7 +81,13 @@ async function submit() {
       <div class="form-grid">
         <div class="field">
           <label for="password">{{ t('auth.password') }}</label
-          ><input id="password" v-model="form.password" type="password" minlength="10" required />
+          ><input
+            id="password"
+            v-model="form.password"
+            type="password"
+            minlength="10"
+            required
+          /><span v-if="fieldErrors.password" class="field-error">{{ fieldErrors.password }}</span>
         </div>
         <div class="field">
           <label for="confirmPassword">{{ t('auth.confirmPassword') }}</label
@@ -81,7 +101,9 @@ async function submit() {
           }}</span>
         </div>
       </div>
-      <button class="button primary">{{ t('auth.signUp') }}</button>
+      <button class="button primary" :disabled="submitting">
+        {{ submitting ? t('common.loading') : t('auth.signUp') }}
+      </button>
     </form>
     <p class="auth-footer">
       <RouterLink class="link" to="/sign-in">{{ t('auth.signIn') }}</RouterLink>
