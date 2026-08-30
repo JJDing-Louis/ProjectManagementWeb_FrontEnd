@@ -76,9 +76,13 @@ onMounted(load)
             <td>{{ user.isVerified ? '✓' : '—' }}</td>
             <td><StatusBadge :value="user.isEnabled ? 'Active' : 'Disabled'" /></td>
             <td>
-              <RouterLink class="link" :to="{ name: 'user-detail', params: { userId: user.id } }">{{
-                t('common.edit')
-              }}</RouterLink>
+              <RouterLink
+                v-if="!user.isBootstrapAdmin"
+                class="link"
+                :to="{ name: 'user-detail', params: { userId: user.id } }"
+                >{{ t('common.edit') }}</RouterLink
+              >
+              <span v-else class="table-subtitle">{{ t('user.protected') }}</span>
             </td>
           </tr>
         </tbody>

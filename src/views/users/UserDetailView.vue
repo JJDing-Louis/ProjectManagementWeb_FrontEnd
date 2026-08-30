@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
@@ -17,6 +17,7 @@ const user = ref<User>()
 const error = ref('')
 const form = reactive({ roleId: '', isEnabled: true })
 const roles = ref<RoleOption[]>([])
+const isBootstrapAdmin = computed(() => user.value?.isBootstrapAdmin === true)
 onMounted(async () => {
   try {
     ;[user.value, roles.value] = await Promise.all([
@@ -76,7 +77,7 @@ async function save() {
       <aside class="card">
         <div class="card-header"><h2>Access</h2></div>
         <div class="card-body">
-          <form v-if="auth.isAdmin" @submit.prevent="save">
+          <form v-if="auth.isAdmin && !isBootstrapAdmin" @submit.prevent="save">
             <div class="field">
               <label for="role">{{ t('user.role') }}</label
               ><select id="role" v-model="form.roleId" required>
@@ -92,6 +93,9 @@ async function save() {
               <button class="button primary">{{ t('common.save') }}</button>
             </div>
           </form>
+          <p v-else-if="isBootstrapAdmin" style="color: var(--slate-500)">
+            {{ t('user.bootstrapAdminProtected') }}
+          </p>
           <p v-else style="color: var(--slate-500)">{{ t('message.forbidden') }}</p>
         </div>
       </aside>

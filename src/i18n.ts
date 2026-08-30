@@ -89,6 +89,8 @@ const zhTW = {
     verified: '已驗證',
     enabled: '帳號狀態',
     detail: '使用者詳情',
+    protected: '系統保護',
+    bootstrapAdminProtected: '系統預設 Admin 具備最高權限，其角色與帳號狀態不可修改。',
   },
   settings: {
     title: '個人設定',
@@ -197,6 +199,9 @@ const en = {
     verified: 'Verified',
     enabled: 'Account Status',
     detail: 'User Detail',
+    protected: 'Protected',
+    bootstrapAdminProtected:
+      'The bootstrap Admin has full system access. Its role and account status cannot be changed.',
   },
   settings: {
     title: 'Settings',

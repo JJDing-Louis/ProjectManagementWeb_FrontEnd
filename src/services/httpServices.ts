@@ -39,6 +39,7 @@ interface UserDto {
   emailConfirmed: boolean
   isEnabled: boolean
   role: SystemRole
+  isBootstrapAdmin?: boolean
 }
 
 interface CurrentUserDto extends UserDto {
@@ -118,6 +119,7 @@ function mapUser(dto: UserDto): User {
     role: dto.role,
     isVerified: dto.emailConfirmed,
     isEnabled: dto.isEnabled,
+    isBootstrapAdmin: dto.isBootstrapAdmin ?? false,
   }
 }
 

@@ -12,6 +12,7 @@ export interface User {
   role: SystemRole
   isVerified: boolean
   isEnabled: boolean
+  isBootstrapAdmin?: boolean
 }
 
 export interface CurrentUser extends User {
