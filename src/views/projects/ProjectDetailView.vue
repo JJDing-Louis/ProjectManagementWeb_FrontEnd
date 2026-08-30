@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
+import MultiSelectDropdown from '@/components/MultiSelectDropdown.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
@@ -24,6 +25,8 @@ const roles = ref<ProjectRoleOption[]>([])
 const error = ref('')
 const selectedUser = ref('')
 const selectedRoleIds = ref<string[]>([])
+const memberRoleSelections = ref<Record<string, string[]>>({})
+const savingMemberIds = ref(new Set<string>())
 const canManage = computed(() => {
   const value = project.value
   const actor = auth.user
@@ -44,6 +47,9 @@ const ownerName = computed(
 async function load() {
   try {
     project.value = await services.projects.get(String(route.params.projectId))
+    memberRoleSelections.value = Object.fromEntries(
+      project.value.members.map((member) => [member.userId, member.roles.map((role) => role.id)]),
+    )
     if (canManage.value) {
       ;[candidates.value, roles.value] = await Promise.all([
         services.projects.memberCandidates(project.value.id),
@@ -69,15 +75,31 @@ async function addMember() {
     error.value = reason instanceof ApiError ? reason.message : 'Failed'
   }
 }
-async function changeRoles(userId: string, event: Event) {
-  if (!project.value) return
-  const roleIds = [...(event.target as HTMLSelectElement).selectedOptions].map(
-    (option) => option.value,
-  )
+async function changeRoles(userId: string, roleIds: string[]) {
+  if (!project.value || savingMemberIds.value.has(userId)) return
   if (!roleIds.length) return
-  await services.projects.updateMember(project.value.id, userId, roleIds)
-  await load()
-  ui.notify(t('message.saved'))
+  const previousRoleIds = project.value.members
+    .find((member) => member.userId === userId)
+    ?.roles.map((role) => role.id)
+  memberRoleSelections.value = { ...memberRoleSelections.value, [userId]: roleIds }
+  savingMemberIds.value = new Set(savingMemberIds.value).add(userId)
+  try {
+    await services.projects.updateMember(project.value.id, userId, roleIds)
+    await load()
+    ui.notify(t('message.saved'))
+  } catch (reason) {
+    if (previousRoleIds) {
+      memberRoleSelections.value = {
+        ...memberRoleSelections.value,
+        [userId]: previousRoleIds,
+      }
+    }
+    error.value = reason instanceof ApiError ? reason.message : 'Failed'
+  } finally {
+    const nextSavingMemberIds = new Set(savingMemberIds.value)
+    nextSavingMemberIds.delete(userId)
+    savingMemberIds.value = nextSavingMemberIds
+  }
 }
 async function removeMember(userId: string) {
   if (
@@ -131,14 +153,19 @@ onMounted(load)
               </select>
             </div>
             <div class="field">
-              <label for="member-role">{{ t('project.role') }}</label
-              ><select id="member-role" v-model="selectedRoleIds" multiple required>
-                <option v-for="role in roles" :key="role.id" :value="role.id">
-                  {{ role.name }}
-                </option>
-              </select>
+              <label for="member-role">{{ t('project.role') }}</label>
+              <MultiSelectDropdown
+                v-model="selectedRoleIds"
+                input-id="member-role"
+                :accessible-label="t('project.role')"
+                :options="roles"
+                :placeholder="t('project.selectRole')"
+                required
+              />
             </div>
-            <button class="button primary">{{ t('project.addMember') }}</button>
+            <button class="button primary" :disabled="!selectedUser || !selectedRoleIds.length">
+              {{ t('project.addMember') }}
+            </button>
           </form>
           <div class="table-wrap">
             <table class="data-table">
@@ -156,16 +183,18 @@ onMounted(load)
                     ><span class="table-subtitle">{{ member.account }}</span>
                   </td>
                   <td>
-                    <select
+                    <MultiSelectDropdown
                       v-if="canManage"
-                      multiple
-                      :value="member.roles.map((role) => role.id)"
-                      @change="changeRoles(member.userId, $event)"
-                    >
-                      <option v-for="role in roles" :key="role.id" :value="role.id">
-                        {{ role.name }}
-                      </option></select
-                    ><span v-else>{{ member.roles.map((role) => role.name).join(', ') }}</span>
+                      :model-value="memberRoleSelections[member.userId] ?? []"
+                      :input-id="`member-roles-${member.userId}`"
+                      :accessible-label="`${member.displayName} ${t('project.role')}`"
+                      :options="roles"
+                      :placeholder="t('project.selectRole')"
+                      :disabled="savingMemberIds.has(member.userId)"
+                      required
+                      @update:model-value="changeRoles(member.userId, $event)"
+                    />
+                    <span v-else>{{ member.roles.map((role) => role.name).join(', ') }}</span>
                   </td>
                   <td v-if="canManage">
                     <button
