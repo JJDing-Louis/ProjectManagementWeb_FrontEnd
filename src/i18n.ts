@@ -59,6 +59,7 @@ const zhTW = {
     archived: '已封存',
     detail: '專案詳情',
     edit: '編輯專案',
+    version: '版本',
   },
   task: {
     title: 'Task 列表',
@@ -169,6 +170,7 @@ const en = {
     archived: 'Archived',
     detail: 'Project Detail',
     edit: 'Edit Project',
+    version: 'Version',
   },
   task: {
     title: 'Task List',

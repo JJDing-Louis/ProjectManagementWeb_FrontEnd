@@ -33,6 +33,7 @@ const project = {
   status: 'Pending' as const,
   createdAt: '2026-08-31T00:00:00Z',
   updatedAt: '2026-08-31T00:00:00Z',
+  versionNumber: 3,
   rowVersion: 'AAAA',
   members: [
     {
@@ -131,5 +132,14 @@ describe('ProjectDetailView', () => {
     expect(memberTable.find('col.member-role-column').exists()).toBe(true)
     expect(memberTable.find('col.member-action-column').exists()).toBe(true)
     expect(memberTable.get('th.member-action-cell').text()).toBe('操作')
+  })
+
+  it('Overview顯示可讀版本且不顯示並行控制權杖', async () => {
+    const wrapper = await mountView()
+
+    expect(wrapper.text()).toContain('版本')
+    expect(wrapper.text()).toContain('v3')
+    expect(wrapper.text()).not.toContain(project.rowVersion)
+    expect(wrapper.text()).not.toContain('Concurrency token')
   })
 })

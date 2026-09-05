@@ -53,6 +53,7 @@ export interface Project {
   status: ProjectStatus
   createdAt: string
   updatedAt: string
+  versionNumber: number
   rowVersion: string
   members: ProjectMember[]
 }

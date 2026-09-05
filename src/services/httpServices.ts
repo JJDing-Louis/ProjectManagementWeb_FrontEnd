@@ -68,6 +68,7 @@ interface ProjectDto {
   status: Project['status']
   createdAt: string
   updatedAt: string
+  versionNumber: number
   rowVersion: string
 }
 
@@ -150,6 +151,7 @@ function mapProject(dto: ProjectDto, members: ProjectMember[] = []): Project {
     status: dto.status,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
+    versionNumber: dto.versionNumber,
     rowVersion: dto.rowVersion,
     members,
   }

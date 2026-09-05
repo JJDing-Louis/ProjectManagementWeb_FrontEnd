@@ -246,7 +246,8 @@ onMounted(load)
             ><span>{{ new Date(project.updatedAt).toLocaleString() }}</span>
           </div>
           <div class="detail-item">
-            <label>Concurrency token</label><span>{{ project.rowVersion }}</span>
+            <label>{{ t('project.version') }}</label
+            ><span>v{{ project.versionNumber }}</span>
           </div>
           <RouterLink
             class="button primary"
