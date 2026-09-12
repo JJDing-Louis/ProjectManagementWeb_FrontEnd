@@ -4,7 +4,7 @@
 
 本文件適用於 `ProjectManagementWeb_FrontEnd` 目錄及其所有子目錄。
 
-本目錄目前尚未建立前端專案。後續初始化、開發、審查與測試皆以 **Vue 3** 為技術方向，不得將其他框架的範例或 scaffold 視為已完成的 Vue 3 實作。
+本目錄為已完成初始化並已串接 Backend API 的 **Vue 3** 前端專案。後續開發、審查與測試必須延續既有的 Vue 3、TypeScript、Vite、Vue Router、Pinia、Vitest 與 Playwright 技術基線，不得將其他框架的範例或 scaffold 視為本專案的既有實作。
 
 ## 2. 需求與文件的優先順序
 
