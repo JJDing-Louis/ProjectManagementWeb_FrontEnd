@@ -70,8 +70,8 @@ async function submit() {
             ><input
               id="project-name"
               v-model.trim="form.name"
-              minlength="2"
-              maxlength="120"
+              minlength="1"
+              maxlength="200"
               required
             />
           </div>
@@ -95,7 +95,7 @@ async function submit() {
           </div>
           <div class="field full">
             <label for="project-description">{{ t('project.description') }}</label
-            ><textarea id="project-description" v-model.trim="form.description" required />
+            ><textarea id="project-description" v-model.trim="form.description" maxlength="4000" />
           </div>
         </div>
         <div class="form-actions">

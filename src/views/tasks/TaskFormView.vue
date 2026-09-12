@@ -130,7 +130,7 @@ async function submit() {
               id="task-description"
               v-model.trim="form.description"
               :disabled="editing && !fullEdit"
-              required
+              maxlength="8000"
             />
           </div>
         </div>
