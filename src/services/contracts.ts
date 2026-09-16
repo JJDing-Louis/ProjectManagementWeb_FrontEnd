@@ -56,6 +56,7 @@ export interface ProjectService {
   memberCandidates(projectId: string, search?: string): Promise<MemberCandidate[]>
   create(input: ProjectInput): Promise<Project>
   update(id: string, input: ProjectInput): Promise<Project>
+  remove(project: Project): Promise<void>
   addMember(projectId: string, userId: string, roleIds: string[]): Promise<void>
   updateMember(projectId: string, userId: string, roleIds: string[]): Promise<void>
   removeMember(projectId: string, userId: string): Promise<void>

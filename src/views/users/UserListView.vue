@@ -5,18 +5,31 @@ import PageHeader from '@/components/PageHeader.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { services } from '@/services'
-import type { PageResult, SystemRole, User, UserQuery } from '@/types/models'
+import {
+  ApiError,
+  type PageResult,
+  type SystemRole,
+  type User,
+  type UserQuery,
+} from '@/types/models'
 const { t } = useI18n()
 const query = reactive<UserQuery>({ search: '', role: '', page: 1, pageSize: 20 })
 const result = ref<PageResult<User>>({ items: [], page: 1, pageSize: 20, totalCount: 0 })
 const roles: SystemRole[] = ['Admin', 'Administrator', 'User', 'Viewer']
 const pages = computed(() => Math.max(1, Math.ceil(result.value.totalCount / query.pageSize)))
 const loading = ref(true)
+const error = ref('')
 let timer: number | undefined
 async function load() {
   loading.value = true
-  result.value = await services.users.list(query)
-  loading.value = false
+  error.value = ''
+  try {
+    result.value = await services.users.list(query)
+  } catch (reason) {
+    error.value = reason instanceof ApiError ? reason.message : 'Load failed'
+  } finally {
+    loading.value = false
+  }
 }
 watch(
   () => [query.search, query.role],
@@ -52,7 +65,8 @@ onMounted(load)
         </select>
       </div>
     </div>
-    <div v-if="loading" class="empty-state">{{ t('common.loading') }}</div>
+    <div v-if="error" class="alert" role="alert">{{ error }}</div>
+    <div v-else-if="loading" class="empty-state">{{ t('common.loading') }}</div>
     <EmptyState v-else-if="!result.items.length" :title="t('common.noData')" />
     <div v-else class="table-wrap">
       <table class="data-table">

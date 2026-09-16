@@ -42,13 +42,18 @@ async function toApiError(response: Response): Promise<ApiError> {
 
 async function execute(path: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMilliseconds)
+  let timedOut = false
+  const timeout = window.setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMilliseconds)
   const abort = () => controller.abort()
   init.signal?.addEventListener('abort', abort, { once: true })
   try {
     return await fetch(`${apiBase}${path}`, { ...init, signal: controller.signal })
   } catch (reason) {
-    if (controller.signal.aborted) throw new ApiError(0, 'Request timed out or was cancelled.')
+    if (timedOut) throw new ApiError(0, 'Request timed out.')
+    if (controller.signal.aborted) throw new ApiError(0, 'Request was cancelled.')
     throw reason instanceof ApiError ? reason : new ApiError(0, 'Unable to reach the server.')
   } finally {
     window.clearTimeout(timeout)

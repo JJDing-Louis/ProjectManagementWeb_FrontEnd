@@ -13,7 +13,8 @@
     "lint": "eslint . --max-warnings=0",
     "type-check": "vue-tsc --build",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:isolated": "bash scripts/run-isolated-e2e.sh"
   },
   "dependencies": {
     "pinia": "^3.0.3",

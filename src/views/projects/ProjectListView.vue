@@ -6,19 +6,26 @@ import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
-import type { PageResult, Project, ProjectQuery } from '@/types/models'
+import { ApiError, type PageResult, type Project, type ProjectQuery } from '@/types/models'
 
 const { t } = useI18n()
 const auth = useAuthStore()
 const query = reactive<ProjectQuery>({ search: '', status: '', page: 1, pageSize: 6 })
 const result = ref<PageResult<Project>>({ items: [], page: 1, pageSize: 6, totalCount: 0 })
 const loading = ref(true)
+const error = ref('')
 const canCreate = computed(() => auth.hasFunction('projects.create'))
 const pages = computed(() => Math.max(1, Math.ceil(result.value.totalCount / query.pageSize)))
 async function load() {
   loading.value = true
-  result.value = await services.projects.list(query)
-  loading.value = false
+  error.value = ''
+  try {
+    result.value = await services.projects.list(query)
+  } catch (reason) {
+    error.value = reason instanceof ApiError ? reason.message : 'Load failed'
+  } finally {
+    loading.value = false
+  }
 }
 function changePage(delta: number) {
   query.page += delta
@@ -65,7 +72,8 @@ onMounted(load)
         </div>
       </div>
     </div>
-    <div v-if="loading" class="empty-state">{{ t('common.loading') }}</div>
+    <div v-if="error" class="alert" role="alert">{{ error }}</div>
+    <div v-else-if="loading" class="empty-state">{{ t('common.loading') }}</div>
     <EmptyState
       v-else-if="!result.items.length"
       :title="t('common.noData')"

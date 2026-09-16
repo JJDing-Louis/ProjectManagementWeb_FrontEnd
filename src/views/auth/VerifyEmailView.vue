@@ -11,13 +11,23 @@ const token = String(route.query.token ?? '')
 const verificationEmailSent = route.query.emailSent !== 'false'
 const message = ref('')
 const error = ref('')
-async function verify() {
+const submitting = ref(false)
+function verify() {
+  if (submitting.value) return
+  void verifyAsync()
+}
+async function verifyAsync() {
+  message.value = ''
+  error.value = ''
+  submitting.value = true
   try {
     if (!accountId || !token) return
     await services.auth.verifyEmail(accountId, token)
     message.value = 'Email verified. Your account remains Viewer until an Admin changes the role.'
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Verification failed'
+  } finally {
+    submitting.value = false
   }
 }
 </script>
@@ -32,14 +42,19 @@ async function verify() {
       <p v-else>註冊成功，請開啟信箱中的驗證連結。</p>
     </template>
     <p v-else>請確認這次 Email 驗證。</p>
-    <div v-if="message" class="alert success-alert">{{ message }}</div>
-    <div v-if="error" class="alert">{{ error }}</div>
-    <button v-if="accountId && token" class="button primary" @click="verify">Verify email</button>
+    <div v-if="message" class="alert success-alert" role="status">{{ message }}</div>
+    <div v-if="error" class="alert" role="alert">{{ error }}</div>
+    <button v-if="accountId && token" class="button primary" :disabled="submitting" @click="verify">
+      {{ submitting ? 'Verifying...' : 'Verify email' }}
+    </button>
     <p class="auth-footer">
-      <RouterLink v-if="!token && !verificationEmailSent" class="link" to="/resend-verification"
+      <RouterLink
+        v-if="(!token && !verificationEmailSent) || error"
+        class="link"
+        to="/resend-verification"
         >重新寄送驗證信</RouterLink
       >
-      <span v-if="!token && !verificationEmailSent"> · </span>
+      <span v-if="(!token && !verificationEmailSent) || error"> · </span>
       <RouterLink class="link" to="/sign-in">Return to sign in</RouterLink>
     </p></AuthLayout
   >

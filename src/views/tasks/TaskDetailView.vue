@@ -33,6 +33,12 @@ const canEdit = computed(() =>
 const canComment = computed(() => auth.hasFunction('comments.create'))
 const userName = (id: string) =>
   project.value?.members.find((member) => member.userId === id)?.displayName ?? id
+function validateComment(value: string) {
+  const length = value.trim().length
+  if (length >= 1 && length <= 2000) return true
+  error.value = t('task.commentLength')
+  return false
+}
 async function load() {
   try {
     ;[task.value, comments.value, project.value] = await Promise.all([
@@ -45,7 +51,9 @@ async function load() {
   }
 }
 async function addComment() {
+  if (!validateComment(content.value)) return
   try {
+    error.value = ''
     await services.tasks.addComment(projectId, taskId, content.value)
     content.value = ''
     comments.value = await services.tasks.listComments(projectId, taskId)
@@ -56,15 +64,22 @@ async function addComment() {
 }
 async function removeComment(comment: TaskComment) {
   if (!confirm(t('message.confirmRemove', { name: 'comment' }))) return
-  await services.tasks.removeComment(projectId, taskId, comment)
-  comments.value = await services.tasks.listComments(projectId, taskId)
+  try {
+    error.value = ''
+    await services.tasks.removeComment(projectId, taskId, comment)
+    comments.value = await services.tasks.listComments(projectId, taskId)
+  } catch (reason) {
+    error.value = reason instanceof ApiError ? reason.message : 'Delete failed'
+  }
 }
 function startEditing(comment: TaskComment) {
   editingCommentId.value = comment.id
   editingContent.value = comment.content
 }
 async function saveComment(comment: TaskComment) {
+  if (!validateComment(editingContent.value)) return
   try {
+    error.value = ''
     await services.tasks.updateComment(projectId, taskId, comment, editingContent.value)
     editingCommentId.value = ''
     editingContent.value = ''
@@ -77,7 +92,7 @@ async function saveComment(comment: TaskComment) {
 onMounted(load)
 </script>
 <template>
-  <div v-if="error" class="alert">{{ error }}</div>
+  <div v-if="error" class="alert" role="alert">{{ error }}</div>
   <div v-if="!task && !error" class="empty-state">{{ t('common.loading') }}</div>
   <template v-if="task"
     ><PageHeader :eyebrow="task.code" :title="task.title" :description="task.description"
@@ -118,10 +133,12 @@ onMounted(load)
               ><span>{{ new Date(task.deadline).toLocaleString() }}</span>
             </div>
             <div class="detail-item">
-              <label>Created</label><span>{{ new Date(task.createdAt).toLocaleString() }}</span>
+              <label>{{ t('task.createdAt') }}</label
+              ><span>{{ new Date(task.createdAt).toLocaleString() }}</span>
             </div>
             <div class="detail-item">
-              <label>Concurrency token</label><span>{{ task.rowVersion }}</span>
+              <label>{{ t('task.updatedAt') }}</label
+              ><span>{{ new Date(task.updatedAt).toLocaleString() }}</span>
             </div>
             <div class="detail-item full" style="grid-column: 1/-1">
               <label>{{ t('task.description') }}</label>

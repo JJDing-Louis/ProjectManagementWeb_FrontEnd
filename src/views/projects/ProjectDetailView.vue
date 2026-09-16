@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import MultiSelectDropdown from '@/components/MultiSelectDropdown.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -17,16 +17,20 @@ import {
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const ui = useUiStore()
 const project = ref<Project>()
 const candidates = ref<MemberCandidate[]>([])
 const roles = ref<ProjectRoleOption[]>([])
 const error = ref('')
+const candidateSearch = ref('')
+const searchingCandidates = ref(false)
 const selectedUser = ref('')
 const selectedRoleIds = ref<string[]>([])
 const memberRoleSelections = ref<Record<string, string[]>>({})
 const savingMemberIds = ref(new Set<string>())
+const deletingProject = ref(false)
 const canManage = computed(() => {
   const value = project.value
   const actor = auth.user
@@ -44,6 +48,7 @@ const ownerName = computed(
   () =>
     project.value?.members.find((member) => member.userId === project.value?.ownerId)?.displayName,
 )
+const canDelete = computed(() => auth.user?.role === 'Administrator' || auth.user?.role === 'Admin')
 async function load() {
   try {
     project.value = await services.projects.get(String(route.params.projectId))
@@ -73,6 +78,22 @@ async function addMember() {
     ui.notify(t('message.saved'))
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Failed'
+  }
+}
+async function searchCandidates() {
+  if (!project.value || searchingCandidates.value) return
+  searchingCandidates.value = true
+  error.value = ''
+  try {
+    candidates.value = await services.projects.memberCandidates(
+      project.value.id,
+      candidateSearch.value.trim(),
+    )
+    selectedUser.value = ''
+  } catch (reason) {
+    error.value = reason instanceof ApiError ? reason.message : 'Failed to search members'
+  } finally {
+    searchingCandidates.value = false
   }
 }
 async function changeRoles(userId: string, roleIds: string[]) {
@@ -119,10 +140,29 @@ async function removeMember(userId: string) {
     error.value = reason instanceof ApiError ? reason.message : 'Failed'
   }
 }
+async function removeProject() {
+  if (
+    !project.value ||
+    deletingProject.value ||
+    !confirm(t('message.confirmSoftRemove', { name: project.value.name }))
+  )
+    return
+  deletingProject.value = true
+  error.value = ''
+  try {
+    await services.projects.remove(project.value)
+    ui.notify(t('message.removed'))
+    await router.push({ name: 'projects' })
+  } catch (reason) {
+    error.value = reason instanceof ApiError ? reason.message : 'Failed'
+  } finally {
+    deletingProject.value = false
+  }
+}
 onMounted(load)
 </script>
 <template>
-  <div v-if="error" class="alert">{{ error }}</div>
+  <div v-if="error" class="alert" role="alert">{{ error }}</div>
   <div v-if="!project && !error" class="empty-state">{{ t('common.loading') }}</div>
   <template v-if="project"
     ><PageHeader :eyebrow="project.code" :title="project.name"
@@ -134,7 +174,15 @@ onMounted(load)
         class="button primary"
         :to="{ name: 'project-edit', params: { projectId: project.id } }"
         >{{ t('common.edit') }}</RouterLink
-      ></PageHeader
+      ><button
+        v-if="canDelete"
+        class="button danger project-delete-button"
+        type="button"
+        :disabled="deletingProject"
+        @click="removeProject"
+      >
+        {{ t('common.remove') }}
+      </button></PageHeader
     >
     <div class="detail-grid">
       <section class="card project-content-card">
@@ -144,6 +192,9 @@ onMounted(load)
           </div>
           <div class="card-body project-description">
             <p>{{ project.description || '—' }}</p>
+            <p>
+              <strong>{{ t('project.timeZone') }}：</strong>{{ project.timeZoneId }}
+            </p>
           </div>
         </section>
         <section class="project-content-section" aria-labelledby="project-member-heading">
@@ -152,6 +203,24 @@ onMounted(load)
           </div>
           <div class="card-body">
             <form v-if="canManage" class="toolbar" @submit.prevent="addMember">
+              <div class="field grow">
+                <label for="member-search">{{ t('common.search') }}</label
+                ><input
+                  id="member-search"
+                  v-model="candidateSearch"
+                  autocomplete="off"
+                  placeholder="Account or name"
+                  @keydown.enter.prevent="searchCandidates"
+                />
+              </div>
+              <button
+                class="button secondary member-search-button"
+                type="button"
+                :disabled="searchingCandidates"
+                @click="searchCandidates"
+              >
+                {{ t('common.search') }}
+              </button>
               <div class="field grow">
                 <label for="member">{{ t('user.name') }}</label
                 ><select id="member" v-model="selectedUser" required>

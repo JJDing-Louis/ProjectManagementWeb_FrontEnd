@@ -65,6 +65,7 @@ interface ProjectDto {
   name: string
   description: string | null
   ownerAccountId: string
+  timeZoneId: string
   status: Project['status']
   createdAt: string
   updatedAt: string
@@ -148,6 +149,7 @@ function mapProject(dto: ProjectDto, members: ProjectMember[] = []): Project {
     name: dto.name,
     description: dto.description ?? '',
     ownerId: dto.ownerAccountId,
+    timeZoneId: dto.timeZoneId,
     status: dto.status,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
@@ -303,6 +305,7 @@ export const services: AppServices = {
             name: input.name,
             description: input.description || null,
             ownerAccountId: input.ownerId,
+            timeZoneId: input.timeZoneId,
           }),
         ),
       )
@@ -315,10 +318,17 @@ export const services: AppServices = {
             name: input.name,
             description: input.description || null,
             ownerAccountId: input.ownerId,
+            timeZoneId: input.timeZoneId,
             status: input.status,
             rowVersion: input.rowVersion,
           }),
         ),
+      )
+    },
+    async remove(project) {
+      await request<void>(
+        `/projects/${project.id}${queryString({ rowVersion: project.rowVersion })}`,
+        { method: 'DELETE' },
       )
     },
     async addMember(projectId, userId, roleIds) {

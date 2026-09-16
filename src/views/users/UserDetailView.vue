@@ -15,6 +15,7 @@ const auth = useAuthStore()
 const ui = useUiStore()
 const user = ref<User>()
 const error = ref('')
+const submitting = ref(false)
 const form = reactive({ roleId: '', isEnabled: true })
 const roles = ref<RoleOption[]>([])
 const isBootstrapAdmin = computed(() => user.value?.isBootstrapAdmin === true)
@@ -31,7 +32,9 @@ onMounted(async () => {
   }
 })
 async function save() {
-  if (!user.value) return
+  if (!user.value || submitting.value) return
+  error.value = ''
+  submitting.value = true
   try {
     user.value = await services.users.updateAdministration(
       user.value.id,
@@ -41,11 +44,13 @@ async function save() {
     ui.notify(t('message.saved'))
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Save failed'
+  } finally {
+    submitting.value = false
   }
 }
 </script>
 <template>
-  <div v-if="error" class="alert">{{ error }}</div>
+  <div v-if="error" class="alert" role="alert">{{ error }}</div>
   <div v-if="!user && !error" class="empty-state">{{ t('common.loading') }}</div>
   <template v-if="user"
     ><PageHeader eyebrow="Directory" :title="user.displayName" :description="`@${user.account}`"
@@ -90,7 +95,9 @@ async function save() {
               ><input v-model="form.isEnabled" type="checkbox" />{{ t('common.active') }}</label
             >
             <div class="form-actions">
-              <button class="button primary">{{ t('common.save') }}</button>
+              <button class="button primary" :disabled="submitting">
+                {{ submitting ? t('common.loading') : t('common.save') }}
+              </button>
             </div>
           </form>
           <p v-else-if="isBootstrapAdmin" style="color: var(--slate-500)">

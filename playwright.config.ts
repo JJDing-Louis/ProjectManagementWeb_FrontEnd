@@ -1,13 +1,17 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const frontendPort = process.env.PMW_E2E_FRONTEND_PORT ?? '5173'
+const frontendBaseUrl = `http://localhost:${frontendPort}`
+const apiBaseUrl = process.env.PMW_E2E_API_BASE_URL ?? 'http://localhost:8080'
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
-  use: { baseURL: 'http://localhost:5173', trace: 'retain-on-failure' },
+  use: { baseURL: frontendBaseUrl, trace: 'retain-on-failure' },
   webServer: {
-    command: 'VITE_API_BASE_URL=http://localhost:8080 npm run dev -- --host localhost --port 5173',
-    url: 'http://localhost:5173',
-    reuseExistingServer: true,
+    command: `VITE_API_BASE_URL=${apiBaseUrl} npm run dev -- --host localhost --port ${frontendPort}`,
+    url: frontendBaseUrl,
+    reuseExistingServer: false,
   },
   projects: [
     {

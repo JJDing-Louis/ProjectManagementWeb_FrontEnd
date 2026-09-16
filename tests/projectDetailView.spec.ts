@@ -4,6 +4,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
+import { ApiError } from '@/types/models'
 import ProjectDetailView from '@/views/projects/ProjectDetailView.vue'
 
 const projectService = vi.hoisted(() => ({
@@ -13,6 +14,7 @@ const projectService = vi.hoisted(() => ({
   addMember: vi.fn(),
   updateMember: vi.fn(),
   removeMember: vi.fn(),
+  remove: vi.fn(),
 }))
 
 vi.mock('@/services', () => ({
@@ -30,6 +32,7 @@ const project = {
   name: '測試專案',
   description: '測試',
   ownerId: 'user-1',
+  timeZoneId: 'Asia/Taipei',
   status: 'Pending' as const,
   createdAt: '2026-08-31T00:00:00Z',
   updatedAt: '2026-08-31T00:00:00Z',
@@ -42,10 +45,16 @@ const project = {
       displayName: 'Louis Test',
       roles: [roles[0]!],
     },
+    {
+      userId: 'user-2',
+      account: 'member',
+      displayName: 'Project Member',
+      roles: [roles[1]!],
+    },
   ],
 }
 
-async function mountView() {
+async function mountView(role: 'Administrator' | 'Admin' | 'User' | 'Viewer' = 'Admin') {
   const pinia = createPinia()
   setActivePinia(pinia)
   const auth = useAuthStore()
@@ -54,7 +63,7 @@ async function mountView() {
     account: 'admin',
     displayName: 'Admin',
     email: 'admin@example.test',
-    role: 'Admin',
+    role,
     isVerified: true,
     isEnabled: true,
     functions: ['projects.manage-all'],
@@ -94,8 +103,37 @@ describe('ProjectDetailView', () => {
     projectService.memberCandidates.mockResolvedValue([])
     projectService.roles.mockResolvedValue(roles)
     projectService.updateMember.mockResolvedValue(undefined)
+    projectService.addMember.mockResolvedValue(undefined)
+    projectService.removeMember.mockResolvedValue(undefined)
+    projectService.remove.mockResolvedValue(undefined)
   })
 
+  // 測試案例：TC-F-MEMBER-001（候選人搜尋與最小揭露）
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-16 10:16:48 +08:00
+  it('依帳號或名稱搜尋候選人且畫面只顯示最小必要欄位', async () => {
+    projectService.memberCandidates
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'user-3', account: 'candidate-account', displayName: 'Candidate Name' },
+      ])
+    const wrapper = await mountView()
+
+    await wrapper.get('#member-search').setValue('  candidate  ')
+    await wrapper.get('button.member-search-button').trigger('click')
+    await flushPromises()
+
+    expect(projectService.memberCandidates).toHaveBeenLastCalledWith('project-1', 'candidate')
+    const options = wrapper.findAll('#member option')
+    expect(options).toHaveLength(2)
+    expect(options[1]!.attributes('value')).toBe('user-3')
+    expect(options[1]!.text()).toBe('Candidate Name (candidate-account)')
+    expect(wrapper.text()).not.toContain('@')
+  })
+
+  // 測試案例：TC-F-MEMBER-002、TC-ST-MEMBER-005
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-16 10:16:48 +08:00
   it('新增與修改專案角色皆使用收合式多選 Dropdown', async () => {
     const wrapper = await mountView()
 
@@ -112,6 +150,85 @@ describe('ProjectDetailView', () => {
     ])
   })
 
+  // 測試案例：TC-F-MEMBER-002（加入多角色成員）
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-16 10:16:48 +08:00
+  it('新增成員會送出完整多角色集合', async () => {
+    projectService.memberCandidates.mockResolvedValue([
+      { id: 'user-3', account: 'candidate', displayName: 'Candidate' },
+    ])
+    const wrapper = await mountView()
+
+    await wrapper.get('#member').setValue('user-3')
+    await wrapper.get('button[aria-label="專案角色"]').trigger('click')
+    await wrapper.get('input[value="frontend"]').setValue(true)
+    await wrapper.get('form.toolbar').trigger('submit')
+    await flushPromises()
+
+    expect(projectService.addMember).toHaveBeenCalledWith('project-1', 'user-3', [
+      'member',
+      'frontend',
+    ])
+  })
+
+  // 測試案例：TC-ERR-MEMBER-006（Owner 移除保護）
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-16 10:16:48 +08:00
+  it('Owner 的移除按鈕停用但非 Owner 成員仍可操作', async () => {
+    const wrapper = await mountView()
+    const buttons = wrapper.findAll('.member-table button.danger')
+
+    expect(buttons).toHaveLength(2)
+    expect(buttons[0]!.attributes('disabled')).toBeDefined()
+    expect(buttons[1]!.attributes('disabled')).toBeUndefined()
+  })
+
+  // 測試案例：TC-ERR-MEMBER-007（未完成 Task 阻擋移除）
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-16 10:16:48 +08:00
+  it('成員移除被阻擋時顯示錯誤且保留原成員', async () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    )
+    projectService.removeMember.mockRejectedValue(
+      new ApiError(409, '請先重新指派未完成的 Task。', {}, 'task_reassignment_required'),
+    )
+    const wrapper = await mountView()
+
+    await wrapper.findAll('.member-table button.danger')[1]!.trigger('click')
+    await flushPromises()
+
+    expect(projectService.removeMember).toHaveBeenCalledWith('project-1', 'user-2')
+    expect(wrapper.get('[role="alert"]').text()).toBe('請先重新指派未完成的 Task。')
+    expect(wrapper.text()).toContain('Project Member')
+    vi.unstubAllGlobals()
+  })
+
+  // 測試案例：TC-ERR-MEMBER-009（候選人在提交前失效）
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-16 10:16:48 +08:00
+  it('候選人提交時失效會顯示 API 錯誤並保留選擇', async () => {
+    projectService.memberCandidates.mockResolvedValue([
+      { id: 'user-3', account: 'candidate', displayName: 'Candidate' },
+    ])
+    projectService.addMember.mockRejectedValue(
+      new ApiError(422, '所選帳號已無法使用，請重新選擇。', {}, 'invalid_account'),
+    )
+    const wrapper = await mountView()
+    const candidate = wrapper.get<HTMLSelectElement>('#member')
+    await candidate.setValue('user-3')
+
+    await wrapper.get('form.toolbar').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('所選帳號已無法使用，請重新選擇。')
+    expect(candidate.element.value).toBe('user-3')
+  })
+
+  // 測試案例：TC-F-MEMBER-008（Project 詳情與成員呈現）
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-16 10:16:48 +08:00
   it('白色內容卡片依序顯示 Description 與 Member 兩個區段', async () => {
     const wrapper = await mountView()
     const contentCard = wrapper.get('.project-content-card')
@@ -122,8 +239,18 @@ describe('ProjectDetailView', () => {
     expect(sections[0]?.get('h2').text()).toBe('說明')
     expect(sections[0]?.text()).toContain(project.description)
     expect(sections[1]?.get('h2').text()).toBe('成員')
+    expect(sections[1]?.text()).toContain('Louis Test')
+    expect(sections[1]?.text()).toContain('louis')
+    expect(sections[1]?.text()).toContain('Member')
+    expect(sections[1]?.text()).toContain('Project Member')
+    expect(sections[1]?.text()).toContain('member')
+    expect(sections[1]?.text()).toContain('FrontendDeveloper')
+    expect(sections[1]?.text()).not.toContain('@')
   })
 
+  // 測試案例：TC-F-UI-001（成員表格版面）
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-16 10:16:48 +08:00
   it('成員表格為 Action 保留獨立欄寬', async () => {
     const wrapper = await mountView()
     const memberTable = wrapper.get('.member-table')
@@ -134,6 +261,9 @@ describe('ProjectDetailView', () => {
     expect(memberTable.get('th.member-action-cell').text()).toBe('操作')
   })
 
+  // 測試案例：TC-ST-PRJ-006（可讀版本顯示）
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-16 10:16:48 +08:00
   it('Overview顯示可讀版本且不顯示並行控制權杖', async () => {
     const wrapper = await mountView()
 
@@ -141,5 +271,51 @@ describe('ProjectDetailView', () => {
     expect(wrapper.text()).toContain('v3')
     expect(wrapper.text()).not.toContain(project.rowVersion)
     expect(wrapper.text()).not.toContain('Concurrency token')
+  })
+
+  // 測試案例：TC-ST-PRJ-009、TC-ERR-PRJ-010（軟刪除角色、確認、成功與失敗 UI）
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-16 15:20:57 +08:00
+  it.each(['Administrator', 'Admin'] as const)('%s 確認後可軟刪除並返回專案清單', async (role) => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    )
+    const wrapper = await mountView(role)
+
+    await wrapper.get('button.project-delete-button').trigger('click')
+    await flushPromises()
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('刪除後不會出現在一般清單'))
+    expect(projectService.remove).toHaveBeenCalledWith(project)
+    expect(wrapper.vm.$router.currentRoute.value.name).toBe('projects')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    vi.unstubAllGlobals()
+  })
+
+  // 測試案例：TC-ERR-PRJ-010（User、Viewer 無 UI；取消或 API 失敗不離開詳情）
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-16 15:20:57 +08:00
+  it('User與Viewer不顯示刪除，而取消或衝突會保留詳情', async () => {
+    expect((await mountView('User')).find('button.project-delete-button').exists()).toBe(false)
+    expect((await mountView('Viewer')).find('button.project-delete-button').exists()).toBe(false)
+
+    const confirmMock = vi.fn(() => false)
+    vi.stubGlobal('confirm', confirmMock)
+    const cancelled = await mountView('Admin')
+    await cancelled.get('button.project-delete-button').trigger('click')
+    expect(projectService.remove).not.toHaveBeenCalled()
+    expect(cancelled.text()).toContain(project.name)
+
+    confirmMock.mockReturnValue(true)
+    projectService.remove.mockRejectedValue(
+      new ApiError(409, '資料已被其他人更新，請重新載入。', {}, 'concurrency_conflict'),
+    )
+    const conflicted = await mountView('Admin')
+    await conflicted.get('button.project-delete-button').trigger('click')
+    await flushPromises()
+    expect(conflicted.get('[role="alert"]').text()).toContain('資料已被其他人更新')
+    expect(conflicted.text()).toContain(project.name)
+    vi.unstubAllGlobals()
   })
 })

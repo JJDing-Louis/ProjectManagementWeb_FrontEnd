@@ -8,6 +8,9 @@ const options = [
 ]
 
 describe('MultiSelectDropdown', () => {
+  // 測試案例：TC-F-MEMBER-002、TC-ERR-MEMBER-004（Frontend component；部分覆蓋）
+  // 測試結果：Passed（2 tests）
+  // 上次測試時間：2026-09-15 15:34:06 +08:00
   it('預設收合並在展開後顯示可複選的角色', async () => {
     const wrapper = mount(MultiSelectDropdown, {
       props: {

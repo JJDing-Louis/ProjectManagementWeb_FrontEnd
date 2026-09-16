@@ -13,36 +13,58 @@ const ui = useUiStore()
 const id = computed(() => String(route.params.projectId ?? ''))
 const editing = computed(() => Boolean(id.value))
 const owners = ref<Array<{ id: string; displayName: string }>>([])
-const error = ref('')
+const loading = ref(true)
+const submitting = ref(false)
+const loadError = ref('')
+const saveError = ref('')
+const timeZoneOptions = [
+  'Asia/Taipei',
+  'Asia/Tokyo',
+  'America/Los_Angeles',
+  'America/New_York',
+  'Europe/London',
+  'Australia/Sydney',
+  'Etc/UTC',
+]
 const form = reactive({
   name: '',
   description: '',
   ownerId: '',
-  status: 'Active' as ProjectStatus,
+  timeZoneId: '',
+  status: 'Pending' as ProjectStatus,
   rowVersion: undefined as string | undefined,
 })
 onMounted(async () => {
-  if (editing.value) {
-    const project = await services.projects.get(id.value)
-    owners.value = project.members.map((member) => ({
-      id: member.userId,
-      displayName: member.displayName,
-    }))
-    Object.assign(form, {
-      name: project.name,
-      description: project.description,
-      ownerId: project.ownerId,
-      status: project.status,
-      rowVersion: project.rowVersion,
-    })
-  } else {
-    owners.value = (await services.users.listAll())
-      .filter((user) => user.isEnabled)
-      .map((user) => ({ id: user.id, displayName: user.displayName }))
+  try {
+    if (editing.value) {
+      const project = await services.projects.get(id.value)
+      owners.value = project.members.map((member) => ({
+        id: member.userId,
+        displayName: member.displayName,
+      }))
+      Object.assign(form, {
+        name: project.name,
+        description: project.description,
+        ownerId: project.ownerId,
+        timeZoneId: project.timeZoneId,
+        status: project.status,
+        rowVersion: project.rowVersion,
+      })
+    } else {
+      owners.value = (await services.users.listAll())
+        .filter((user) => user.isEnabled && user.isVerified && user.role === 'Administrator')
+        .map((user) => ({ id: user.id, displayName: user.displayName }))
+    }
+  } catch (reason) {
+    loadError.value = reason instanceof ApiError ? reason.message : 'Load failed'
+  } finally {
+    loading.value = false
   }
 })
 async function submit() {
-  error.value = ''
+  if (submitting.value) return
+  saveError.value = ''
+  submitting.value = true
   try {
     const saved = editing.value
       ? await services.projects.update(id.value, form)
@@ -50,7 +72,9 @@ async function submit() {
     ui.notify(t('message.saved'))
     await router.push({ name: 'project-detail', params: { projectId: saved.id } })
   } catch (reason) {
-    error.value = reason instanceof ApiError ? reason.message : 'Save failed'
+    saveError.value = reason instanceof ApiError ? reason.message : 'Save failed'
+  } finally {
+    submitting.value = false
   }
 }
 </script>
@@ -62,8 +86,10 @@ async function submit() {
   >
   <section class="card">
     <div class="card-body">
-      <div v-if="error" class="alert">{{ error }}</div>
-      <form @submit.prevent="submit">
+      <div v-if="loadError" class="alert" role="alert">{{ loadError }}</div>
+      <div v-else-if="loading" class="empty-state">{{ t('common.loading') }}</div>
+      <form v-else @submit.prevent="submit">
+        <div v-if="saveError" class="alert" role="alert">{{ saveError }}</div>
         <div class="form-grid">
           <div class="field">
             <label for="project-name">{{ t('project.name') }}</label
@@ -84,13 +110,22 @@ async function submit() {
               </option>
             </select>
           </div>
-          <div class="field">
+          <div v-if="editing" class="field">
             <label for="project-form-status">{{ t('common.status') }}</label
             ><select id="project-form-status" v-model="form.status">
               <option>Active</option>
               <option>Pending</option>
               <option>Completed</option>
               <option>Archived</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="project-time-zone">{{ t('project.timeZone') }}</label
+            ><select id="project-time-zone" v-model="form.timeZoneId" required>
+              <option value="">{{ t('project.selectTimeZone') }}</option>
+              <option v-for="timeZoneId in timeZoneOptions" :key="timeZoneId" :value="timeZoneId">
+                {{ timeZoneId }}
+              </option>
             </select>
           </div>
           <div class="field full">
@@ -101,7 +136,9 @@ async function submit() {
         <div class="form-actions">
           <button type="button" class="button secondary" @click="router.back()">
             {{ t('common.cancel') }}</button
-          ><button class="button primary">{{ t('common.save') }}</button>
+          ><button class="button primary" :disabled="submitting">
+            {{ submitting ? t('common.loading') : t('common.save') }}
+          </button>
         </div>
       </form>
     </div>

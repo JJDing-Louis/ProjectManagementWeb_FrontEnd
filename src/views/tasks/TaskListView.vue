@@ -27,7 +27,7 @@ const project = ref<Project>()
 const result = ref<PageResult<TaskItem>>({ items: [], page: 1, pageSize: 8, totalCount: 0 })
 const loading = ref(true)
 const error = ref('')
-const selected = ref(new Set<string>())
+const selected = ref(new Map<string, TaskItem>())
 const targetStatus = ref<TaskStatus>('InProgress')
 const preference = ref<UserPreference>()
 const query = reactive<TaskQuery>({
@@ -57,6 +57,7 @@ const allSelected = computed(
     editableOnPage.value.length > 0 &&
     editableOnPage.value.every((task) => selected.value.has(task.id)),
 )
+const batchLimitExceeded = computed(() => selected.value.size > 10)
 async function load() {
   loading.value = true
   error.value = ''
@@ -92,6 +93,7 @@ watch(
   () => [query.search, query.status, query.assigneeId, query.mineOnly, query.sort],
   () => {
     query.page = 1
+    selected.value = new Map()
     window.clearTimeout(filterTimer)
     filterTimer = window.setTimeout(() => {
       syncQuery()
@@ -100,28 +102,31 @@ watch(
   },
 )
 function toggleAll() {
-  const next = new Set(selected.value)
+  const next = new Map(selected.value)
   if (allSelected.value) editableOnPage.value.forEach((task) => next.delete(task.id))
-  else editableOnPage.value.forEach((task) => next.add(task.id))
+  else editableOnPage.value.forEach((task) => next.set(task.id, task))
   selected.value = next
 }
-function toggle(id: string) {
-  const next = new Set(selected.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
+function toggle(task: TaskItem) {
+  const next = new Map(selected.value)
+  if (next.has(task.id)) next.delete(task.id)
+  else next.set(task.id, task)
   selected.value = next
 }
 async function batchUpdate() {
-  if (!selected.value.size) return
+  if (!selected.value.size || batchLimitExceeded.value) return
   if (
     !preference.value?.skipBatchConfirmation &&
     !confirm(`${t('task.selected', { count: selected.value.size })} → ${targetStatus.value}?`)
   )
     return
   try {
-    const tasks = result.value.items.filter((task) => selected.value.has(task.id))
-    const updatedCount = await services.tasks.batchUpdate(projectId, tasks, targetStatus.value)
-    selected.value = new Set()
+    const updatedCount = await services.tasks.batchUpdate(
+      projectId,
+      [...selected.value.values()],
+      targetStatus.value,
+    )
+    selected.value = new Map()
     ui.notify(t('message.updated', { count: updatedCount }))
     await load()
   } catch (reason) {
@@ -129,13 +134,19 @@ async function batchUpdate() {
   }
 }
 async function removeTask(task: TaskItem) {
-  if (!confirm(t('message.confirmRemove', { name: task.title }))) return
-  await services.tasks.remove(projectId, task)
-  ui.notify(t('message.removed'))
-  await load()
+  if (!confirm(t('message.confirmSoftRemove', { name: task.title }))) return
+  try {
+    error.value = ''
+    await services.tasks.remove(projectId, task)
+    ui.notify(t('message.removed'))
+    await load()
+  } catch (reason) {
+    error.value = reason instanceof ApiError ? reason.message : 'Delete failed'
+  }
 }
 function changePage(delta: number) {
   query.page += delta
+  selected.value = new Map()
   syncQuery()
   void load()
 }
@@ -156,7 +167,7 @@ onMounted(initialLoad)
       >＋ {{ t('task.new') }}</RouterLink
     ></PageHeader
   >
-  <div v-if="error" class="alert">{{ error }}</div>
+  <div v-if="error" class="alert" role="alert">{{ error }}</div>
   <section class="card">
     <div class="card-header">
       <div class="toolbar" style="margin: 0; width: 100%">
@@ -204,10 +215,15 @@ onMounted(initialLoad)
             <option v-for="status in statuses" :key="status">{{ status }}</option>
           </select>
         </div>
-        <button class="button primary" :disabled="!selected.size" @click="batchUpdate">
+        <button
+          class="button primary"
+          :disabled="!selected.size || batchLimitExceeded"
+          @click="batchUpdate"
+        >
           {{ t('common.confirm') }} · {{ selected.size }}
         </button>
       </div>
+      <p v-if="batchLimitExceeded" class="alert" role="alert">{{ t('task.batchLimit') }}</p>
     </div>
     <div v-if="loading" class="empty-state">{{ t('common.loading') }}</div>
     <EmptyState
@@ -245,7 +261,7 @@ onMounted(initialLoad)
                 :checked="selected.has(task.id)"
                 :disabled="!canEdit(task)"
                 :aria-label="`Select ${task.title}`"
-                @change="toggle(task.id)"
+                @change="toggle(task)"
               />
             </td>
             <td>{{ task.code }}</td>

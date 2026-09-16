@@ -64,7 +64,7 @@ async function submit() {
       </div>
       <div class="field">
         <label for="displayName">{{ t('auth.displayName') }}</label
-        ><input id="displayName" v-model.trim="form.displayName" required /><span
+        ><input id="displayName" v-model.trim="form.displayName" maxlength="100" required /><span
           v-if="fieldErrors.displayName"
           class="field-error"
           >{{ fieldErrors.displayName }}</span

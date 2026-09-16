@@ -50,6 +50,7 @@ export interface Project {
   name: string
   description: string
   ownerId: string
+  timeZoneId: string
   status: ProjectStatus
   createdAt: string
   updatedAt: string
@@ -136,6 +137,7 @@ export interface ProjectInput {
   name: string
   description: string
   ownerId: string
+  timeZoneId: string
   status: ProjectStatus
   rowVersion?: string | undefined
 }
