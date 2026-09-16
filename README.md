@@ -7,7 +7,7 @@ ProjectManagementWeb 是以 Vue 3、TypeScript 與 Vite 建立的前後端分離
 - 登入、註冊、Email 驗證與重新寄送驗證信的前端流程。
 - `Admin`、`Administrator`、`User`、`Viewer` 系統角色與操作限制。
 - 桌面固定 Sidebar、手機抽屜導覽及可展開的 Project tree。
-- Project 搜尋、狀態篩選、建立、修改及成員管理。
+- Project 搜尋、狀態篩選、IANA 時區、建立、修改、軟刪除及成員管理。
 - Task 搜尋、狀態／指派者篩選、URL query、分頁、排序與只看本人。
 - Task 新增、修改、軟刪除、optimistic concurrency 與全有或全無的批次更新。
 - Task 留言新增、修改與軟刪除。
@@ -115,6 +115,9 @@ npm run test
 # Playwright 桌面與手機流程
 npm run test:e2e
 
+# 建立全新 SQL volume、即時測試密碼與隔離 Backend 的完整 E2E
+npm run test:e2e:isolated
+
 # Production build
 npm run build
 
@@ -138,8 +141,8 @@ npm run preview
 - Prettier format check。
 - ESLint。
 - vue-tsc strict type check。
-- Vitest：7 個測試通過。
-- Playwright 串接實際 Backend：7 個通過，3 個因裝置不適用而略過。
+- Vitest：75 個測試通過，Failed 0、Skipped 0。
+- Playwright 隔離 E2E：desktop／mobile 共 22 個測試通過，Failed 0、Skipped 0。
 - Vite production build。
 - 實際驗證登入／refresh cookie、Project 與 Task 自動編號、桌面與手機主要流程。
 
@@ -147,4 +150,4 @@ npm run preview
 
 - Email 驗證的 token 與確認 API 流程已串接；實際寄信仍取決於 Backend SMTP secret 與外部郵件服務。
 - 前端權限顯示來自 `/auth/me.functions` 與專案角色，但正式安全邊界仍由 Backend 強制執行。
-- E2E 需先啟動 SQL Server 與 Backend，並透過 `PMW_E2E_PASSWORD` 提供測試 Admin 密碼。
+- `npm run test:e2e` 連接既有 Backend 時可自行提供 `PMW_E2E_PASSWORD`；建議完整回歸使用 `npm run test:e2e:isolated`，腳本會建立全新 SQL volume、即時產生測試密碼、停用真實 SMTP，並於結束後清除容器與 volume。

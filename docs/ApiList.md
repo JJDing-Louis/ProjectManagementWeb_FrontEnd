@@ -52,6 +52,7 @@
 | POST   | `/projects`                          | 建立專案；request 不含 Code                 |
 | GET    | `/projects/{id}`                     | 查詢專案詳情                                |
 | PUT    | `/projects/{id}`                     | 更新專案、Owner、四種狀態與 `rowVersion`    |
+| DELETE | `/projects/{id}?rowVersion=...`      | `Administrator`／`Admin` 軟刪除專案         |
 | GET    | `/projects/roles`                    | 載入專案角色 ID                             |
 | GET    | `/projects/{id}/members`             | 載入含多重 roles 的專案成員                 |
 | GET    | `/projects/{id}/member-candidates`   | 管理者搜尋可加入成員；僅回傳 ID、帳號及姓名 |
@@ -59,7 +60,7 @@
 | PUT    | `/projects/{id}/members/{accountId}` | 完整取代成員角色集合                        |
 | DELETE | `/projects/{id}/members/{accountId}` | 移除非 Owner 且無未完成 Task 的成員         |
 
-列表與詳情以 `code` 顯示業務編號，但 API 與 Vue route 一律使用 GUID。Owner 移交後，新 Owner 由後端保證具有 `ProjectManager`。
+列表與詳情以 `code` 顯示業務編號，但 API 與 Vue route 一律使用 GUID。建立與修改必須傳送合法 IANA `timeZoneId`；Owner 必須是已啟用、Email 已驗證的 `Administrator`，修改 Owner 時還必須已是 Project member。Owner 移交後，新 Owner 由後端保證具有 `ProjectManager`。Project 軟刪除成功後保留成員、Task、留言與歷史資料，但一般 Project scope 不再顯示。
 
 ## Task Items
 

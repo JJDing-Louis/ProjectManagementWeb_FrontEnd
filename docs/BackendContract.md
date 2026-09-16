@@ -50,12 +50,14 @@ export interface CreateProjectRequest {
   name: string
   description: string | null
   ownerAccountId: Guid
+  timeZoneId: string
 }
 
 export interface UpdateProjectRequest {
   name: string
   description: string | null
   ownerAccountId: Guid
+  timeZoneId: string
   status: 'Pending' | 'Active' | 'Completed' | 'Archived'
   rowVersion: RowVersion
 }
@@ -64,9 +66,12 @@ export interface UpdateProjectRequest {
 - Create request 不包含 `code`；response 的唯讀 code 格式為 `PRJ-YYYYMMDD######`。
 - 日期使用 UTC，Project 流水號每日獨立從 `000001` 起算。
 - 列表／詳情顯示 code；route 與 API 使用 GUID。
+- `timeZoneId` 必填且必須是合法 IANA timezone ID；前端不得省略或自行假設伺服器時區。
+- Owner 必須是已啟用、Email 已驗證且系統角色恰為 `Administrator` 的帳號；修改 Owner 時還必須已是該 Project member。
 - Owner 必須具有 `ProjectManager`；移交時 Backend 在同一交易補上角色，舊 Owner 原角色不移除。
 - Project member 具有 `roles: ProjectRole[]`，新增與更新都傳送 `projectRoleIds: Guid[]`。
 - member-candidate 分頁只揭露 `accountId`、`account`、`name`，且只能由可管理該專案者呼叫。
+- Project 軟刪除使用 `DELETE /projects/{id}?rowVersion=...`，只允許 `Administrator` 與 `Admin`；成功後保留關聯資料，但一般 Project scope 不再顯示。
 
 ## Task
 

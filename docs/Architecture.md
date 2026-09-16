@@ -12,13 +12,13 @@ flowchart LR
         direction LR
 
         subgraph Presentation[Presentation Layer]
-            AuthViews[Auth Views<br/>SignIn / SignUp / Verify]
-            ProjectViews[Project Views<br/>List / Detail / Form]
-            TaskViews[Task Views<br/>List / Detail / Form]
-            UserViews[User Views<br/>List / Detail / Settings]
-            Shell[AppShell / AppSidebar<br/>RWD Navigation]
-            Router[Vue Router<br/>Route Guards]
-            I18n[vue-i18n<br/>zh-TW / en]
+            AuthViews[Auth Views／SignIn / SignUp / Verify]
+            ProjectViews[Project Views／List / Detail / Form]
+            TaskViews[Task Views／List / Detail / Form]
+            UserViews[User Views／List / Detail / Settings]
+            Shell[AppShell / AppSidebar／RWD Navigation]
+            Router[Vue Router／Route Guards]
+            I18n[vue-i18n／zh-TW / en]
         end
 
         subgraph ClientState[Client State]
@@ -27,20 +27,20 @@ flowchart LR
         end
 
         subgraph ApplicationBoundary[Application Boundary]
-            Contracts[Service Interfaces<br/>Auth / User / Project / Task / Preference]
-            Models[Typed Models<br/>Inputs / Queries / ApiError]
+            Contracts[Service Interfaces／Auth / User / Project / Task / Preference]
+            Models[Typed Models／Inputs / Queries / ApiError]
         end
 
         subgraph Infrastructure[Infrastructure]
-            HttpAdapter[HTTP Service Adapters<br/>Auth / User / Project / Task / Comment / Preference]
-            HttpClient[HTTP Client<br/>CSRF / Refresh / Timeout / Problem Details]
-            Mapper[DTO Mappers<br/>API Contract to View Models]
+            HttpAdapter[HTTP Service Adapters／Auth / User / Project / Task / Comment / Preference]
+            HttpClient[HTTP Client／CSRF / Refresh / Timeout / Problem Details]
+            Mapper[DTO Mappers／API Contract to View Models]
         end
     end
 
-    Memory[(Memory<br/>Access Token)]
-    Cookie[(HttpOnly Cookie<br/>Refresh Token)]
-    Backend[ASP.NET Core Web API<br/>/api/v1]
+    Memory[(Memory／Access Token)]
+    Cookie[(HttpOnly Cookie／Refresh Token)]
+    Backend[ASP.NET Core Web API／/api/v1]
 
     Shell --> Router
     Router --> AuthStore
@@ -139,14 +139,14 @@ sequenceDiagram
 
 ## Route 與 View 分組
 
-| Feature    | Views                                           | 主要 Route                              |
-| ---------- | ----------------------------------------------- | --------------------------------------- |
-| Auth       | SignIn、SignUp、VerifyEmail、ResendVerification | `/sign-in`、`/sign-up`、`/verify-email` |
-| Project    | ProjectList、ProjectDetail、ProjectForm         | `/projects`、`/projects/:projectId`     |
-| Task       | TaskList、TaskDetail、TaskForm                  | `/projects/:projectId/task-items`       |
-| User       | UserList、UserDetail                            | `/users`、`/users/:userId`              |
-| Preference | Settings                                        | `/settings`                             |
-| Error      | Forbidden、NotFound                             | `/forbidden`、fallback route            |
+| Feature    | Views                                           | 主要 Route                                                                                                                                                                      |
+| ---------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth       | SignIn、SignUp、VerifyEmail、ResendVerification | `/sign-in`、`/sign-up`、`/verify-email`、`/resend-verification`                                                                                                                 |
+| Project    | ProjectList、ProjectDetail、ProjectForm         | `/projects`、`/projects/:projectId`、`/admin/projects/new`、`/admin/projects/:projectId/edit`                                                                                   |
+| Task       | TaskList、TaskDetail、TaskForm                  | `/projects/:projectId/task-items`、`/projects/:projectId/task-items/:taskId`、`/admin/projects/:projectId/task-items/new`、`/admin/projects/:projectId/task-items/:taskId/edit` |
+| User       | UserList、UserDetail                            | `/users`、`/users/:userId`                                                                                                                                                      |
+| Preference | Settings                                        | `/settings`                                                                                                                                                                     |
+| Error      | Forbidden、NotFound                             | `/forbidden`、fallback route                                                                                                                                                    |
 
 ## Browser State Boundary
 
