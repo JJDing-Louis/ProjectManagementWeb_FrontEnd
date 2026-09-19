@@ -101,8 +101,8 @@ async function mountUserList(
 
 describe('Bootstrap Admin 前端保護', () => {
   // 測試案例：TC-ERR-USER-006（Frontend UI；部分覆蓋）
-  // 測試結果：Passed（2 tests）
-  // 上次測試時間：2026-09-15 15:34:06 +08:00
+  // 測試結果：Passed
+  // 上次測試時間：2026-09-19
   beforeEach(() => {
     vi.clearAllMocks()
     userService.list.mockResolvedValue({
@@ -120,17 +120,17 @@ describe('Bootstrap Admin 前端保護', () => {
     ])
   })
 
-  it('使用者列表鎖定系統預設 Admin 的角色與狀態控制項', async () => {
+  it('使用者清單不顯示系統預設最高管理者', async () => {
     const wrapper = await mountUserList()
 
     const rows = wrapper.findAll('tbody tr')
-    expect(rows[0]?.find('a').exists()).toBe(false)
-    expect(rows[0]?.text()).toContain('系統保護')
-    expect(rows[0]?.get('select').attributes('disabled')).toBeDefined()
-    expect(rows[0]?.get('button').attributes('disabled')).toBeDefined()
-    expect(rows[1]?.get('a').text()).toBe('編輯')
-    expect(rows[1]?.get('select').attributes('disabled')).toBeUndefined()
-    expect(rows[1]?.get('button').attributes('disabled')).toBeUndefined()
+    expect(rows).toHaveLength(1)
+    expect(wrapper.text()).not.toContain('admin@example.test')
+    expect(wrapper.text()).toContain('administrator@example.test')
+    expect(wrapper.text()).toContain('1 users')
+    expect(rows[0]?.get('a').text()).toBe('編輯')
+    expect(rows[0]?.get('select').attributes('disabled')).toBeUndefined()
+    expect(rows[0]?.get('button').attributes('disabled')).toBeUndefined()
   })
 
   // 測試案例：TC-F-UI-002（使用者清單 error 狀態）
@@ -159,7 +159,7 @@ describe('Bootstrap Admin 前端保護', () => {
       if (query.page === 2) {
         return { items: [regularAdministrator], page: 2, pageSize: 20, totalCount: 21 }
       }
-      return { items: [bootstrapAdmin], page: 1, pageSize: 20, totalCount: 21 }
+      return { items: [regularAdministrator], page: 1, pageSize: 20, totalCount: 21 }
     })
     try {
       const wrapper = await mountUserList()
@@ -193,7 +193,7 @@ describe('Bootstrap Admin 前端保護', () => {
       .mockResolvedValueOnce({ ...regularAdministrator, role: 'User' })
       .mockResolvedValueOnce({ ...regularAdministrator, role: 'User', isEnabled: false })
     const wrapper = await mountUserList()
-    const row = wrapper.findAll('tbody tr')[1]!
+    const row = wrapper.findAll('tbody tr')[0]!
     const roleSelect = row.get<HTMLSelectElement>('.table-role-select')
     const statusToggle = row.get<HTMLButtonElement>('.account-status-toggle')
 
@@ -224,7 +224,7 @@ describe('Bootstrap Admin 前端保護', () => {
 
   it('缺少完整帳號管理權限時停用列表內的角色與狀態控制項', async () => {
     const wrapper = await mountUserList(['accounts.read'])
-    const regularRow = wrapper.findAll('tbody tr')[1]!
+    const regularRow = wrapper.findAll('tbody tr')[0]!
 
     expect(regularRow.get('select').attributes('disabled')).toBeDefined()
     expect(regularRow.get('button').attributes('disabled')).toBeDefined()

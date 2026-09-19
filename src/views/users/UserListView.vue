@@ -27,11 +27,21 @@ const error = ref('')
 const updatingUserIds = ref(new Set<string>())
 let timer: number | undefined
 
+function excludeBootstrapAdmin(page: PageResult<User>): PageResult<User> {
+  const items = page.items.filter((user) => !user.isBootstrapAdmin)
+  const hiddenCount = page.items.length - items.length
+  return {
+    ...page,
+    items,
+    totalCount: Math.max(0, page.totalCount - hiddenCount),
+  }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    result.value = await services.users.list(query)
+    result.value = excludeBootstrapAdmin(await services.users.list(query))
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Load failed'
   } finally {
@@ -47,7 +57,7 @@ async function initialize() {
       services.users.list(query),
       services.users.roles(),
     ])
-    result.value = users
+    result.value = excludeBootstrapAdmin(users)
     roleOptions.value = availableRoles
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Load failed'
