@@ -110,24 +110,24 @@ describe('ProjectDetailView', () => {
 
   // 測試案例：TC-F-MEMBER-001（候選人搜尋與最小揭露）
   // 測試結果：Passed
-  // 上次測試時間：2026-09-16 10:16:48 +08:00
-  it('依帳號或名稱搜尋候選人且畫面只顯示最小必要欄位', async () => {
-    projectService.memberCandidates
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        { id: 'user-3', account: 'candidate-account', displayName: 'Candidate Name' },
-      ])
+  // 上次測試時間：2026-09-19 20:08:15 +08:00
+  it('在下拉選單輸入帳號或名稱篩選候選人且只顯示最小必要欄位', async () => {
+    projectService.memberCandidates.mockResolvedValue([
+      { id: 'user-3', account: 'candidate-account', displayName: 'Candidate Name' },
+      { id: 'user-4', account: 'another-account', displayName: 'Another Person' },
+    ])
     const wrapper = await mountView()
 
-    await wrapper.get('#member-search').setValue('  candidate  ')
-    await wrapper.get('button.member-search-button').trigger('click')
-    await flushPromises()
+    expect(wrapper.find('#member-search').exists()).toBe(false)
+    expect(wrapper.find('button.member-search-button').exists()).toBe(false)
 
-    expect(projectService.memberCandidates).toHaveBeenLastCalledWith('project-1', 'candidate')
-    const options = wrapper.findAll('#member option')
-    expect(options).toHaveLength(2)
-    expect(options[1]!.attributes('value')).toBe('user-3')
-    expect(options[1]!.text()).toBe('Candidate Name (candidate-account)')
+    await wrapper.get('#member').trigger('click')
+    await wrapper.get('#member-search').setValue('candidate')
+
+    const options = wrapper.findAll('[role="option"]')
+    expect(options).toHaveLength(1)
+    expect(options[0]!.text()).toContain('Candidate Name')
+    expect(options[0]!.text()).toContain('candidate-account')
     expect(wrapper.text()).not.toContain('@')
   })
 
@@ -159,7 +159,8 @@ describe('ProjectDetailView', () => {
     ])
     const wrapper = await mountView()
 
-    await wrapper.get('#member').setValue('user-3')
+    await wrapper.get('#member').trigger('click')
+    await wrapper.get('[role="option"]').trigger('click')
     await wrapper.get('button[aria-label="專案角色"]').trigger('click')
     await wrapper.get('input[value="frontend"]').setValue(true)
     await wrapper.get('form.toolbar').trigger('submit')
@@ -216,14 +217,15 @@ describe('ProjectDetailView', () => {
       new ApiError(422, '所選帳號已無法使用，請重新選擇。', {}, 'invalid_account'),
     )
     const wrapper = await mountView()
-    const candidate = wrapper.get<HTMLSelectElement>('#member')
-    await candidate.setValue('user-3')
+    const candidate = wrapper.get<HTMLButtonElement>('#member')
+    await candidate.trigger('click')
+    await wrapper.get('[role="option"]').trigger('click')
 
     await wrapper.get('form.toolbar').trigger('submit')
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toBe('所選帳號已無法使用，請重新選擇。')
-    expect(candidate.element.value).toBe('user-3')
+    expect(candidate.text()).toContain('Candidate')
   })
 
   // 測試案例：TC-F-MEMBER-008（Project 詳情與成員呈現）

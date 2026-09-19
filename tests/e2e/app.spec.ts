@@ -300,6 +300,51 @@ test('Admin 可建立專案與 Task', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Prepare launch checklist' })).toBeVisible()
 })
 
+// 測試案例：TC-F-MEMBER-001（可搜尋的成員下拉選單）
+// 測試結果：Passed（desktop／mobile；隔離 E2E 2/2）
+// 上次測試時間：2026-09-19 20:10:56 +08:00
+test('新增成員時可在下拉選單依帳號或姓名篩選', async ({ page }, testInfo) => {
+  const candidateAccount = `select-candidate-${testInfo.project.name}`
+  const candidateName = `Selectable Candidate ${testInfo.project.name}`
+  const candidatePassword = 'PmwCandidate-123!'
+
+  await signOut(page, testInfo.project.name)
+  await page.goto('/sign-up')
+  await page.getByLabel('帳號').fill(candidateAccount)
+  await page.getByLabel('顯示名稱').fill(candidateName)
+  await page.getByLabel('電子郵件').fill(`${candidateAccount}@example.test`)
+  await page.getByLabel('密碼', { exact: true }).fill(candidatePassword)
+  await page.getByLabel('確認密碼').fill(candidatePassword)
+  await page.getByRole('button', { name: '註冊' }).click()
+  await expect(page).toHaveURL(/\/verify-email\?accountId=/)
+
+  await page.getByRole('link', { name: 'Return to sign in' }).click()
+  await page.getByLabel('帳號').fill(account)
+  await page.getByLabel('密碼').fill(password!)
+  await page.getByRole('button', { name: '登入' }).click()
+
+  await page.getByRole('link', { name: /新增專案/ }).click()
+  await page.getByLabel('專案名稱').fill(`Searchable Member Project ${testInfo.project.name}`)
+  await page.getByLabel('Owner').selectOption({ index: 1 })
+  await page.getByLabel('時區').selectOption('Asia/Taipei')
+  await page.getByRole('button', { name: '儲存' }).click()
+
+  const memberDropdown = page.getByRole('button', { name: '選擇成員' })
+  await expect(memberDropdown).toBeVisible()
+  await memberDropdown.click()
+
+  const searchInput = page.getByRole('combobox', { name: '輸入帳號或姓名篩選' })
+  await expect(searchInput).toBeFocused()
+  await searchInput.fill(candidateAccount)
+  const candidateOption = page.getByRole('option', {
+    name: new RegExp(`${candidateName}.*${candidateAccount}`),
+  })
+  await expect(candidateOption).toBeVisible()
+  await candidateOption.click()
+  await expect(memberDropdown).toContainText(candidateName)
+  await expect(memberDropdown).toContainText(candidateAccount)
+})
+
 // 測試案例：TC-F-UI-004、TC-F-UI-005、TC-SEC-UI-007、TC-F-UI-008
 // 測試結果：Passed（desktop／mobile；完整隔離 E2E 22/22）
 // 上次測試時間：2026-09-16 20:44:21 +08:00

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import MultiSelectDropdown from '@/components/MultiSelectDropdown.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import SearchableSelectDropdown from '@/features/projects/components/SearchableSelectDropdown.vue'
 import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -24,8 +25,6 @@ const project = ref<Project>()
 const candidates = ref<MemberCandidate[]>([])
 const roles = ref<ProjectRoleOption[]>([])
 const error = ref('')
-const candidateSearch = ref('')
-const searchingCandidates = ref(false)
 const selectedUser = ref('')
 const selectedRoleIds = ref<string[]>([])
 const memberRoleSelections = ref<Record<string, string[]>>({})
@@ -47,6 +46,13 @@ const canManage = computed(() => {
 const ownerName = computed(
   () =>
     project.value?.members.find((member) => member.userId === project.value?.ownerId)?.displayName,
+)
+const candidateOptions = computed(() =>
+  candidates.value.map((candidate) => ({
+    id: candidate.id,
+    label: candidate.displayName,
+    description: candidate.account,
+  })),
 )
 const canDelete = computed(() => auth.user?.role === 'Administrator' || auth.user?.role === 'Admin')
 async function load() {
@@ -78,22 +84,6 @@ async function addMember() {
     ui.notify(t('message.saved'))
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Failed'
-  }
-}
-async function searchCandidates() {
-  if (!project.value || searchingCandidates.value) return
-  searchingCandidates.value = true
-  error.value = ''
-  try {
-    candidates.value = await services.projects.memberCandidates(
-      project.value.id,
-      candidateSearch.value.trim(),
-    )
-    selectedUser.value = ''
-  } catch (reason) {
-    error.value = reason instanceof ApiError ? reason.message : 'Failed to search members'
-  } finally {
-    searchingCandidates.value = false
   }
 }
 async function changeRoles(userId: string, roleIds: string[]) {
@@ -204,31 +194,16 @@ onMounted(load)
           <div class="card-body">
             <form v-if="canManage" class="toolbar" @submit.prevent="addMember">
               <div class="field grow">
-                <label for="member-search">{{ t('common.search') }}</label
-                ><input
-                  id="member-search"
-                  v-model="candidateSearch"
-                  autocomplete="off"
-                  placeholder="Account or name"
-                  @keydown.enter.prevent="searchCandidates"
+                <label for="member">{{ t('project.selectMember') }}</label>
+                <SearchableSelectDropdown
+                  v-model="selectedUser"
+                  input-id="member"
+                  :accessible-label="t('project.selectMember')"
+                  :options="candidateOptions"
+                  :placeholder="t('project.selectMember')"
+                  :search-placeholder="t('project.memberSearchPlaceholder')"
+                  :empty-text="t('common.noData')"
                 />
-              </div>
-              <button
-                class="button secondary member-search-button"
-                type="button"
-                :disabled="searchingCandidates"
-                @click="searchCandidates"
-              >
-                {{ t('common.search') }}
-              </button>
-              <div class="field grow">
-                <label for="member">{{ t('user.name') }}</label
-                ><select id="member" v-model="selectedUser" required>
-                  <option value="">Select a user</option>
-                  <option v-for="user in candidates" :key="user.id" :value="user.id">
-                    {{ user.displayName }} ({{ user.account }})
-                  </option>
-                </select>
               </div>
               <div class="field">
                 <label for="member-role">{{ t('project.role') }}</label>
