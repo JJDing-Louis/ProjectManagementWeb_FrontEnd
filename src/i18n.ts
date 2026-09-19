@@ -98,6 +98,8 @@ const zhTW = {
     role: '系統角色',
     verified: '已驗證',
     enabled: '帳號狀態',
+    roleFor: '{account} 的系統角色',
+    statusFor: '{account} 的帳號狀態',
     detail: '使用者詳情',
     protected: '系統保護',
     bootstrapAdminProtected: '系統預設 Admin 具備最高權限，其角色與帳號狀態不可修改。',
@@ -219,6 +221,8 @@ const en = {
     role: 'System Role',
     verified: 'Verified',
     enabled: 'Account Status',
+    roleFor: 'System role for {account}',
+    statusFor: 'Account status for {account}',
     detail: 'User Detail',
     protected: 'Protected',
     bootstrapAdminProtected:

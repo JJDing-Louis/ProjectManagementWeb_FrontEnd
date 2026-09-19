@@ -80,6 +80,25 @@ async function mountUserDetail(
   return wrapper
 }
 
+async function mountUserList(
+  functions = ['accounts.manage-role', 'accounts.manage-status', 'accounts.read'],
+) {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  useAuthStore().user = {
+    ...regularAdministrator,
+    id: 'operator-id',
+    account: 'operator',
+    functions,
+  }
+  const router = createTestRouter()
+  await router.push('/users')
+  await router.isReady()
+  const wrapper = mount(UserListView, { global: { plugins: [i18n, pinia, router] } })
+  await flushPromises()
+  return wrapper
+}
+
 describe('Bootstrap Admin 前端保護', () => {
   // 測試案例：TC-ERR-USER-006（Frontend UI；部分覆蓋）
   // 測試結果：Passed（2 tests）
@@ -95,21 +114,23 @@ describe('Bootstrap Admin 前端保護', () => {
     userService.get.mockResolvedValue(bootstrapAdmin)
     userService.roles.mockResolvedValue([
       { id: 'admin-role', name: 'Admin', functions: [] },
+      { id: 'administrator-role', name: 'Administrator', functions: [] },
       { id: 'user-role', name: 'User', functions: [] },
+      { id: 'viewer-role', name: 'Viewer', functions: [] },
     ])
   })
 
-  it('使用者列表不顯示系統預設 Admin 的編輯入口', async () => {
-    const router = createTestRouter()
-    await router.push('/users')
-    await router.isReady()
-    const wrapper = mount(UserListView, { global: { plugins: [i18n, router] } })
-    await flushPromises()
+  it('使用者列表鎖定系統預設 Admin 的角色與狀態控制項', async () => {
+    const wrapper = await mountUserList()
 
     const rows = wrapper.findAll('tbody tr')
     expect(rows[0]?.find('a').exists()).toBe(false)
     expect(rows[0]?.text()).toContain('系統保護')
+    expect(rows[0]?.get('select').attributes('disabled')).toBeDefined()
+    expect(rows[0]?.get('button').attributes('disabled')).toBeDefined()
     expect(rows[1]?.get('a').text()).toBe('編輯')
+    expect(rows[1]?.get('select').attributes('disabled')).toBeUndefined()
+    expect(rows[1]?.get('button').attributes('disabled')).toBeUndefined()
   })
 
   // 測試案例：TC-F-UI-002（使用者清單 error 狀態）
@@ -117,12 +138,7 @@ describe('Bootstrap Admin 前端保護', () => {
   // 上次測試時間：2026-09-15 16:20:04 +08:00
   it('使用者清單載入失敗時顯示錯誤且不誤顯空狀態', async () => {
     userService.list.mockRejectedValueOnce(new ApiError(503, '使用者服務暫時無法使用。'))
-    const router = createTestRouter()
-    await router.push('/users')
-    await router.isReady()
-
-    const wrapper = mount(UserListView, { global: { plugins: [i18n, router] } })
-    await flushPromises()
+    const wrapper = await mountUserList()
 
     expect(wrapper.get('[role="alert"]').text()).toBe('使用者服務暫時無法使用。')
     expect(wrapper.text()).not.toContain('沒有符合條件的資料')
@@ -146,13 +162,9 @@ describe('Bootstrap Admin 前端保護', () => {
       return { items: [bootstrapAdmin], page: 1, pageSize: 20, totalCount: 21 }
     })
     try {
-      const router = createTestRouter()
-      await router.push('/users')
-      await router.isReady()
-      const wrapper = mount(UserListView, { global: { plugins: [i18n, router] } })
-      await flushPromises()
+      const wrapper = await mountUserList()
 
-      await wrapper.findAll('button')[1]!.trigger('click')
+      await wrapper.findAll('.pagination button')[1]!.trigger('click')
       await flushPromises()
       expect(wrapper.text()).toContain('administrator@example.test')
       expect(wrapper.text()).toContain('2/2')
@@ -174,6 +186,49 @@ describe('Bootstrap Admin 前端保護', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('使用者列表可用下拉選單與 Toggle 即時更新角色及啟用狀態', async () => {
+    userService.updateAdministration
+      .mockResolvedValueOnce({ ...regularAdministrator, role: 'User' })
+      .mockResolvedValueOnce({ ...regularAdministrator, role: 'User', isEnabled: false })
+    const wrapper = await mountUserList()
+    const row = wrapper.findAll('tbody tr')[1]!
+    const roleSelect = row.get<HTMLSelectElement>('.table-role-select')
+    const statusToggle = row.get<HTMLButtonElement>('.account-status-toggle')
+
+    expect(roleSelect.element.value).toBe('administrator-role')
+    expect(statusToggle.attributes('aria-pressed')).toBe('true')
+
+    await roleSelect.setValue('user-role')
+    await flushPromises()
+    expect(userService.updateAdministration).toHaveBeenNthCalledWith(
+      1,
+      regularAdministrator.id,
+      'user-role',
+      true,
+    )
+    expect(roleSelect.element.value).toBe('user-role')
+
+    await statusToggle.trigger('click')
+    await flushPromises()
+    expect(userService.updateAdministration).toHaveBeenNthCalledWith(
+      2,
+      regularAdministrator.id,
+      'user-role',
+      false,
+    )
+    expect(statusToggle.attributes('aria-pressed')).toBe('false')
+    expect(statusToggle.text()).toContain('停用')
+  })
+
+  it('缺少完整帳號管理權限時停用列表內的角色與狀態控制項', async () => {
+    const wrapper = await mountUserList(['accounts.read'])
+    const regularRow = wrapper.findAll('tbody tr')[1]!
+
+    expect(regularRow.get('select').attributes('disabled')).toBeDefined()
+    expect(regularRow.get('button').attributes('disabled')).toBeDefined()
+    expect(userService.updateAdministration).not.toHaveBeenCalled()
   })
 
   // 測試案例：TC-ST-USER-003、TC-E-USER-008、TC-F-USER-009
