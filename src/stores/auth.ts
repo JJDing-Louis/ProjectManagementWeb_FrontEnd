@@ -25,6 +25,10 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
+  function updateDisplayName(displayName: string) {
+    if (user.value) user.value = { ...user.value, displayName }
+  }
+
   return {
     user,
     initialized,
@@ -35,5 +39,6 @@ export const useAuthStore = defineStore('auth', () => {
     restore,
     signIn,
     signOut,
+    updateDisplayName,
   }
 })

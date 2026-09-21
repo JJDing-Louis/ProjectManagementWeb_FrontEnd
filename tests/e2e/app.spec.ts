@@ -108,13 +108,15 @@ test('桌面版固定顯示導覽且手機版使用抽屜導覽', async ({ page 
   await page.getByRole('link', { name: '使用者列表' }).click()
   await expect(page.getByRole('heading', { name: '使用者列表' })).toBeVisible()
   await expect(page.getByLabel('搜尋')).toBeVisible()
-  await expect(page.getByLabel('系統角色')).toBeVisible()
+  await expect(page.getByLabel('系統角色', { exact: true })).toBeVisible()
   await expect(page.locator('.table-wrap')).toBeVisible()
   await expectNoViewportOverflow(page)
 
   await openMobileNavigation(page, testInfo.project.name)
   await page.getByRole('link', { name: '個人設定' }).click()
   await expect(page.getByRole('heading', { name: '個人設定' }).first()).toBeVisible()
+  await expect(page.getByLabel('姓名')).toBeVisible()
+  await expect(page.getByLabel('電話號碼')).toBeVisible()
   await expect(page.getByLabel('語言')).toBeVisible()
   await expect(page.getByRole('checkbox', { name: '批次更新時不顯示確認視窗' })).toBeVisible()
   await expectNoViewportOverflow(page)
@@ -178,13 +180,58 @@ test('批次確認偏好可保存並在重新載入後維持', async ({ page }, 
   const original = await checkbox.isChecked()
 
   await checkbox.setChecked(!original)
-  await page.getByRole('button', { name: '儲存' }).click()
+  await page.locator('.preference-save').click()
   await expect(page.locator('.toast')).toContainText('資料已儲存')
   await page.reload()
   await expect(checkbox).toBeChecked({ checked: !original })
 
   await checkbox.setChecked(original)
-  await page.getByRole('button', { name: '儲存' }).click()
+  await page.locator('.preference-save').click()
+  await expect(page.locator('.toast')).toContainText('資料已儲存')
+})
+
+// 測試案例：TC-F-USER-008、TC-F-USER-009
+test('名稱與電話可由本人修改並在重新載入後維持', async ({ page }, testInfo) => {
+  await openMobileNavigation(page, testInfo.project.name)
+  await page.getByRole('link', { name: '個人設定' }).click()
+  const nameInput = page.getByLabel('姓名')
+  const phoneInput = page.getByLabel('電話號碼')
+  const originalName = await nameInput.inputValue()
+  const originalPhone = await phoneInput.inputValue()
+  const updatedName = `E2E ${testInfo.project.name}`
+  const updatedPhone = '+886 912-345-678'
+
+  await nameInput.fill(updatedName)
+  await phoneInput.fill(updatedPhone)
+  await page.locator('.profile-save').click()
+  await expect(page.locator('.toast')).toContainText('資料已儲存')
+  const currentUserResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/v1/auth/me') && response.request().method() === 'GET',
+  )
+  await page.reload()
+  const currentUser = (await (await currentUserResponse).json()) as { id: string }
+  await expect(nameInput).toHaveValue(updatedName)
+  await expect(phoneInput).toHaveValue(updatedPhone)
+
+  await openMobileNavigation(page, testInfo.project.name)
+  await expect(page.locator('.profile-copy strong')).toHaveText(updatedName)
+  if (testInfo.project.name === 'mobile') {
+    await page.getByRole('button', { name: 'Close navigation' }).click()
+  }
+
+  await page.goto(`/users/${currentUser.id}`)
+  await expect(page.getByRole('heading', { name: '使用者詳情' })).toBeVisible()
+  await expect(page.locator('.detail-item').filter({ hasText: '姓名' })).toContainText(updatedName)
+  await expect(page.locator('.detail-item').filter({ hasText: '電話號碼' })).toContainText(
+    updatedPhone,
+  )
+
+  await page.goto('/settings')
+  await expect(page.getByRole('heading', { name: '個人設定' }).first()).toBeVisible()
+  await nameInput.fill(originalName)
+  await phoneInput.fill(originalPhone)
+  await page.locator('.profile-save').click()
   await expect(page.locator('.toast')).toContainText('資料已儲存')
 })
 
@@ -379,7 +426,7 @@ test('八頁核心資訊、完整 viewport、鍵盤語意與 Project XSS 防護'
   await expect(page.getByText('Last updated', { exact: true })).toBeVisible()
   await expectNoViewportOverflow(page)
 
-  const roleSelector = page.locator('[aria-haspopup="listbox"]').first()
+  const roleSelector = page.getByRole('button', { name: '專案角色', exact: true })
   await roleSelector.focus()
   await roleSelector.press('Enter')
   await expect(roleSelector).toHaveAttribute('aria-expanded', 'true')

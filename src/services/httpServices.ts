@@ -9,6 +9,7 @@ import {
 import type {
   CurrentUser,
   MemberCandidate,
+  OwnProfile,
   PageResult,
   Project,
   ProjectMember,
@@ -21,6 +22,7 @@ import type {
   TaskItem,
   TaskQuery,
   User,
+  UserDetail,
   UserQuery,
 } from '@/types/models'
 
@@ -44,6 +46,10 @@ interface UserDto {
 
 interface CurrentUserDto extends UserDto {
   functions: string[]
+}
+
+interface UserDetailDto extends UserDto {
+  phoneNumber: string | null
 }
 
 interface ProjectRoleDto {
@@ -127,6 +133,10 @@ function mapUser(dto: UserDto): User {
 
 function mapCurrentUser(dto: CurrentUserDto): CurrentUser {
   return { ...mapUser(dto), functions: dto.functions }
+}
+
+function mapUserDetail(dto: UserDetailDto): UserDetail {
+  return { ...mapUser(dto), phoneNumber: dto.phoneNumber }
 }
 
 function mapProjectRole(dto: ProjectRoleDto): ProjectRoleOption {
@@ -248,7 +258,7 @@ export const services: AppServices = {
       return allPages((page) => this.list({ search, role: '', page, pageSize: 100 }))
     },
     async get(id) {
-      return mapUser(await request<UserDto>(`/users/${id}`))
+      return mapUserDetail(await request<UserDetailDto>(`/users/${id}`))
     },
     async roles() {
       const roles =
@@ -456,5 +466,10 @@ export const services: AppServices = {
     get: () => request('/users/me/preferences'),
     update: (skipBatchConfirmation) =>
       request('/users/me/preferences', json('PUT', { skipBatchConfirmation })),
+  },
+  profile: {
+    get: () => request<OwnProfile>('/users/me/profile'),
+    update: (name, phoneNumber) =>
+      request<OwnProfile>('/users/me/profile', json('PUT', { name, phoneNumber })),
   },
 }

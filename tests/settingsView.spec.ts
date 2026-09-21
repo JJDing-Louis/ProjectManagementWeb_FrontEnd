@@ -7,11 +7,12 @@ import { useUiStore } from '@/stores/ui'
 import { ApiError } from '@/types/models'
 import SettingsView from '@/views/SettingsView.vue'
 
-const preferenceService = vi.hoisted(() => ({ get: vi.fn(), update: vi.fn() }))
-
-vi.mock('@/services', () => ({
-  services: { preferences: preferenceService },
+const serviceMocks = vi.hoisted(() => ({
+  preferences: { get: vi.fn(), update: vi.fn() },
+  profile: { get: vi.fn(), update: vi.fn() },
 }))
+
+vi.mock('@/services', () => ({ services: serviceMocks }))
 
 async function mountView(functions = ['preferences.read-own', 'preferences.update-own']) {
   const pinia = createPinia()
@@ -32,41 +33,75 @@ async function mountView(functions = ['preferences.read-own', 'preferences.updat
 }
 
 describe('SettingsView', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    serviceMocks.profile.get.mockResolvedValue({ name: 'Member', phoneNumber: '0912-345-678' })
+    serviceMocks.preferences.get.mockResolvedValue({ skipBatchConfirmation: false })
+  })
 
-  // 測試案例：TC-F-UI-002（個人設定 error 狀態）
-  // 測試結果：Passed
-  // 上次測試時間：2026-09-15 16:20:04 +08:00
-  it('偏好載入失敗時顯示錯誤且不顯示未載入的預設表單', async () => {
-    preferenceService.get.mockRejectedValue(new ApiError(503, '偏好服務暫時無法使用。'))
+  it('個人設定載入失敗時顯示錯誤且不顯示未載入的表單', async () => {
+    serviceMocks.profile.get.mockRejectedValue(new ApiError(503, '個人資料服務暫時無法使用。'))
 
     const wrapper = await mountView()
 
-    expect(wrapper.get('[role="alert"]').text()).toBe('偏好服務暫時無法使用。')
-    expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('載入中')
+    expect(wrapper.get('[role="alert"]').text()).toBe('個人資料服務暫時無法使用。')
+    expect(wrapper.find('#profile-name').exists()).toBe(false)
   })
 
-  // 測試案例：TC-ERR-PREF-002
-  // 測試結果：Passed
-  // 上次測試時間：2026-09-15 16:20:04 +08:00
-  it('Viewer 可讀取偏好但不顯示可修改控制', async () => {
-    preferenceService.get.mockResolvedValue({ skipBatchConfirmation: true })
-
+  it('Viewer仍可修改自己的名稱與電話但不可修改批次確認偏好', async () => {
+    serviceMocks.profile.update.mockResolvedValue({ name: '新名稱', phoneNumber: null })
     const wrapper = await mountView(['preferences.read-own'])
 
-    expect(wrapper.get<HTMLInputElement>('input[type="checkbox"]').element.checked).toBe(true)
-    expect(wrapper.get('input[type="checkbox"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.find('button').exists()).toBe(false)
+    await wrapper.get('#profile-name').setValue('  新名稱  ')
+    await wrapper.get('#profile-phone').setValue('   ')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(serviceMocks.profile.update).toHaveBeenCalledExactlyOnceWith('新名稱', null)
+    expect(useAuthStore().user?.displayName).toBe('新名稱')
+    expect(
+      wrapper.get<HTMLInputElement>('input[type="checkbox"]').attributes('disabled'),
+    ).toBeDefined()
+    expect(wrapper.find('.preference-save').exists()).toBe(false)
   })
 
-  // 測試案例：TC-F-PREF-001、TC-F-UI-002（成功與 submitting 狀態合併驗證）
-  // 測試結果：Passed
-  // 上次測試時間：2026-09-15 16:20:04 +08:00
+  it('名稱與電話的前端長度驗證失敗時不送出API', async () => {
+    const wrapper = await mountView()
+
+    await wrapper.get('#profile-name').setValue('   ')
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.text()).toContain('請輸入顯示名稱。')
+
+    await wrapper.get('#profile-name').setValue('有效名稱')
+    await wrapper.get('#profile-phone').setValue('1'.repeat(31))
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.text()).toContain('電話號碼不可超過 30 個字元。')
+    expect(serviceMocks.profile.update).not.toHaveBeenCalled()
+  })
+
+  it('後端欄位錯誤會顯示在對應的個人資料欄位且保留輸入', async () => {
+    serviceMocks.profile.update.mockRejectedValue(
+      new ApiError(
+        400,
+        '個人資料欄位驗證失敗。',
+        { phoneNumber: '請輸入有效的電話號碼格式。' },
+        'validation_error',
+      ),
+    )
+    const wrapper = await mountView()
+
+    await wrapper.get('#profile-phone').setValue('invalid-phone')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('請輸入有效的電話號碼格式。')
+    expect(wrapper.get<HTMLInputElement>('#profile-phone').element.value).toBe('invalid-phone')
+  })
+
   it('可更新批次確認偏好且提交中禁止重複送出', async () => {
-    preferenceService.get.mockResolvedValue({ skipBatchConfirmation: false })
     let resolveUpdate!: (value: { skipBatchConfirmation: boolean }) => void
-    preferenceService.update.mockReturnValue(
+    serviceMocks.preferences.update.mockReturnValue(
       new Promise((resolve) => {
         resolveUpdate = resolve
       }),
@@ -74,12 +109,12 @@ describe('SettingsView', () => {
     const wrapper = await mountView()
     const checkbox = wrapper.get<HTMLInputElement>('input[type="checkbox"]')
     await checkbox.setValue(true)
-    const saveButton = wrapper.get('button')
+    const saveButton = wrapper.get('.preference-save')
 
     await saveButton.trigger('click')
     await saveButton.trigger('click')
 
-    expect(preferenceService.update).toHaveBeenCalledExactlyOnceWith(true)
+    expect(serviceMocks.preferences.update).toHaveBeenCalledExactlyOnceWith(true)
     expect(saveButton.attributes('disabled')).toBeDefined()
     resolveUpdate({ skipBatchConfirmation: true })
     await flushPromises()

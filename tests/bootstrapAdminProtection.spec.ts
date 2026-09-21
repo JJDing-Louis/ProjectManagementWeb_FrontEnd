@@ -4,7 +4,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
-import { ApiError, type User } from '@/types/models'
+import { ApiError, type UserDetail } from '@/types/models'
 import UserDetailView from '@/views/users/UserDetailView.vue'
 import UserListView from '@/views/users/UserListView.vue'
 
@@ -37,6 +37,7 @@ const regularAdministrator = {
   displayName: 'Administrator',
   email: 'administrator@example.test',
   role: 'Administrator' as const,
+  phoneNumber: '0912-345-678',
   isBootstrapAdmin: false,
 }
 
@@ -60,7 +61,7 @@ function createTestRouter() {
 }
 
 async function mountUserDetail(
-  target: User = regularAdministrator,
+  target: UserDetail = regularAdministrator,
   functions = ['accounts.manage-role'],
 ) {
   userService.get.mockResolvedValue(target)
@@ -231,7 +232,17 @@ describe('Bootstrap Admin 前端保護', () => {
     expect(userService.updateAdministration).not.toHaveBeenCalled()
   })
 
-  // 測試案例：TC-ST-USER-003、TC-E-USER-008、TC-F-USER-009
+  it('使用者詳情顯示名稱與電話號碼', async () => {
+    const wrapper = await mountUserDetail()
+    const detailItems = wrapper.findAll('.detail-item')
+    const nameItem = detailItems.find((item) => item.get('label').text() === '姓名')
+    const phoneItem = detailItems.find((item) => item.get('label').text() === '電話號碼')
+
+    expect(nameItem?.text()).toContain('Administrator')
+    expect(phoneItem?.text()).toContain('0912-345-678')
+  })
+
+  // 測試案例：TC-ST-USER-003、TC-F-USER-008、TC-F-USER-009
   // 測試結果：Passed
   // 上次測試時間：2026-09-15 16:20:04 +08:00
   it('Admin 只以單一表單更新系統角色與啟用狀態並保留個資唯讀', async () => {

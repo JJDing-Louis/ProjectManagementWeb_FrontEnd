@@ -1,6 +1,7 @@
 import type {
   CurrentUser,
   MemberCandidate,
+  OwnProfile,
   PageResult,
   Project,
   ProjectInput,
@@ -13,6 +14,7 @@ import type {
   TaskQuery,
   TaskStatus,
   User,
+  UserDetail,
   UserPreference,
   UserQuery,
 } from '@/types/models'
@@ -43,7 +45,7 @@ export interface AuthService {
 export interface UserService {
   list(query: UserQuery): Promise<PageResult<User>>
   listAll(search?: string): Promise<User[]>
-  get(id: string): Promise<User>
+  get(id: string): Promise<UserDetail>
   roles(): Promise<RoleOption[]>
   updateAdministration(id: string, roleId: string, isEnabled: boolean): Promise<User>
 }
@@ -86,10 +88,16 @@ export interface PreferenceService {
   update(skipBatchConfirmation: boolean): Promise<UserPreference>
 }
 
+export interface ProfileService {
+  get(): Promise<OwnProfile>
+  update(name: string, phoneNumber: string | null): Promise<OwnProfile>
+}
+
 export interface AppServices {
   auth: AuthService
   users: UserService
   projects: ProjectService
   tasks: TaskItemService
   preferences: PreferenceService
+  profile: ProfileService
 }

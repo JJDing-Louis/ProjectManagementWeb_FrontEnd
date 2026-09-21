@@ -19,6 +19,10 @@ export interface CurrentUser extends User {
   functions: string[]
 }
 
+export interface UserDetail extends User {
+  phoneNumber: string | null
+}
+
 export interface RoleOption {
   id: string
   name: SystemRole
@@ -87,6 +91,11 @@ export interface TaskComment {
 
 export interface UserPreference {
   skipBatchConfirmation: boolean
+}
+
+export interface OwnProfile {
+  name: string
+  phoneNumber: string | null
 }
 
 export interface PageResult<T> {

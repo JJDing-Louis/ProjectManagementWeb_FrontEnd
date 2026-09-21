@@ -7,13 +7,13 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
-import { ApiError, type RoleOption, type User } from '@/types/models'
+import { ApiError, type RoleOption, type UserDetail } from '@/types/models'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const ui = useUiStore()
-const user = ref<User>()
+const user = ref<UserDetail>()
 const error = ref('')
 const submitting = ref(false)
 const form = reactive({ roleId: '', isEnabled: true })
@@ -36,11 +36,12 @@ async function save() {
   error.value = ''
   submitting.value = true
   try {
-    user.value = await services.users.updateAdministration(
+    const updatedUser = await services.users.updateAdministration(
       user.value.id,
       form.roleId,
       form.isEnabled,
     )
+    user.value = { ...updatedUser, phoneNumber: user.value.phoneNumber }
     ui.notify(t('message.saved'))
   } catch (reason) {
     error.value = reason instanceof ApiError ? reason.message : 'Save failed'
@@ -70,8 +71,16 @@ async function save() {
             ><strong>{{ user.account }}</strong>
           </div>
           <div class="detail-item">
+            <label>{{ t('user.name') }}</label
+            ><span>{{ user.displayName }}</span>
+          </div>
+          <div class="detail-item">
             <label>{{ t('user.email') }}</label
             ><span>{{ user.email }}</span>
+          </div>
+          <div class="detail-item">
+            <label>{{ t('user.phoneNumber') }}</label
+            ><span>{{ user.phoneNumber || '—' }}</span>
           </div>
           <div class="detail-item">
             <label>{{ t('user.verified') }}</label

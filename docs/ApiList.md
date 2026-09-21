@@ -33,14 +33,16 @@
 
 ## Users、Roles 與 Preferences
 
-| Method | Route                        | 用途                                          |
-| ------ | ---------------------------- | --------------------------------------------- |
-| GET    | `/users`                     | 搜尋、角色篩選與分頁；需要 `accounts.read`    |
-| GET    | `/users/{id}`                | 查詢帳號；本人或具 `accounts.read`            |
-| PUT    | `/users/{id}/administration` | 以 `{ roleId, isEnabled }` 原子更新角色與狀態 |
-| GET    | `/roles`                     | 載入系統角色 ID 與 functions                  |
-| GET    | `/users/me/preferences`      | 讀取自己的偏好                                |
-| PUT    | `/users/me/preferences`      | 更新自己的偏好                                |
+| Method | Route                        | 用途                                                 |
+| ------ | ---------------------------- | ---------------------------------------------------- |
+| GET    | `/users`                     | 搜尋、角色篩選與分頁；需要 `accounts.read`           |
+| GET    | `/users/{id}`                | 查詢含名稱與電話的帳號詳情；本人或具 `accounts.read` |
+| PUT    | `/users/{id}/administration` | 以 `{ roleId, isEnabled }` 原子更新角色與狀態        |
+| GET    | `/roles`                     | 載入系統角色 ID 與 functions                         |
+| GET    | `/users/me/profile`          | 讀取自己的顯示名稱與電話號碼                         |
+| PUT    | `/users/me/profile`          | 更新自己的顯示名稱與電話號碼                         |
+| GET    | `/users/me/preferences`      | 讀取自己的偏好                                       |
+| PUT    | `/users/me/preferences`      | 更新自己的偏好                                       |
 
 帳號管理頁只允許具有 `accounts.read` 的帳號進入；修改操作仍依 `accounts.manage-role` 與 `accounts.manage-status` 控制。前端不顯示後端未提供的帳號建立時間。
 
