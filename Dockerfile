@@ -9,7 +9,7 @@ COPY . .
 RUN npm run build
 
 
-FROM nginx:1.27-alpine
+FROM nginx:1.30.5-alpine
 
 ENV NGINX_ENVSUBST_FILTER=BACKEND_ORIGIN
 
