@@ -6,6 +6,8 @@
 
 本目錄為已完成初始化並已串接 Backend API 的 **Vue 3** 前端專案。後續開發、審查與測試必須延續既有的 Vue 3、TypeScript、Vite、Vue Router、Pinia、Vitest 與 Playwright 技術基線，不得將其他框架的範例或 scaffold 視為本專案的既有實作。
 
+建立開發分支、提交、Pull Request、Release、Hotfix 或版本 tag 前，先閱讀 `docs/git-flow.md`；該文件是本 repository 的 GitFlow 與 AI Agent Git 作業規範。
+
 ## 2. 需求與文件的優先順序
 
 實作前必須先閱讀與功能相關的規格，需求判斷依下列順序進行：
