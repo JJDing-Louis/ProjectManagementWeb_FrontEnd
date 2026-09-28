@@ -1,0 +1,65 @@
+name: GitFlow Policy
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitflow-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate-gitflow:
+    name: 檢查 GitFlow 合併方向
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      BASE_REF: ${{ github.base_ref }}
+      HEAD_REF: ${{ github.head_ref }}
+
+    steps:
+      - name: 檢查來源與目標分支
+        shell: bash
+        run: |
+          echo "來源分支：${HEAD_REF}"
+          echo "目標分支：${BASE_REF}"
+
+          case "${BASE_REF}" in
+            main)
+              case "${HEAD_REF}" in
+                develop)
+                  echo "允許：develop → main"
+                  ;;
+                hotfix/*)
+                  echo "允許：${HEAD_REF} → main"
+                  ;;
+                *)
+                  echo "::error::main 只接受 develop 或 hotfix/* 的 Pull Request。"
+                  exit 1
+                  ;;
+              esac
+              ;;
+
+            develop)
+              case "${HEAD_REF}" in
+                feature/*|bugfix/*|hotfix/*)
+                  echo "允許：${HEAD_REF} → develop"
+                  ;;
+                *)
+                  echo "::error::develop 只接受 feature/*、bugfix/* 或 hotfix/* 的 Pull Request。"
+                  exit 1
+                  ;;
+              esac
+              ;;
+          esac
