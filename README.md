@@ -141,13 +141,14 @@ npm run preview
 - Project member 支援多重 `roles`，候選人由專案範圍 API 載入。
 - 使用者角色與啟用狀態由 `/users/{id}/administration` 在後端單一交易中更新。
 - 本人名稱與電話由 `/users/me/profile` 維護；電話變更後的確認狀態由後端管理。
+- Email 已驗證的使用者可在個人設定剪裁、上傳與更換本人 1080 × 1080 大頭貼；圖片只存資料庫目前值，並顯示於設定、導覽與使用者詳情。
 
-前端目前實際使用 38 組 HTTP Method／Route。請參閱 [API 清單](docs/ApiList.md) 與 [前後端契約](docs/BackendContract.md)。
+前端目前實際使用 40 組 HTTP Method／Route。請參閱 [API 清單](docs/ApiList.md) 與 [前後端契約](docs/BackendContract.md)。
 
 ## 測試與驗證
 
-- Vitest 涵蓋 HTTP adapter、router、表單契約、主要 View 與共用元件。目前共有 18 個 test files、80 個 tests。
-- Playwright 以 Desktop Chrome（1440×900）與 Pixel 7 兩種 project 執行，目前收錄 26 個案例。
+- Vitest 涵蓋 HTTP adapter、router、表單契約、主要 View 與共用元件。目前共有 20 個 test files、88 個 tests。
+- Playwright 以 Desktop Chrome（1440×900）與 Pixel 7 兩種 project 執行，目前收錄 27 個案例。
 - `npm run test:e2e` 使用現有 Backend；可透過環境變數提供 `PMW_E2E_ACCOUNT`、`PMW_E2E_PASSWORD` 與 `PMW_E2E_API_BASE_URL`。
 - `npm run test:e2e:isolated` 會建立獨立 Docker Compose project、SQL volume 與即時測試密碼，停用真實 SMTP，結束時清除容器與 volume。
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import AppSidebar from '@/components/AppSidebar.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 
@@ -24,7 +25,12 @@ const { sidebarOpen } = storeToRefs(ui)
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
         </button>
         <strong>ProjectManagementWeb</strong>
-        <span class="avatar small">{{ auth.user?.displayName.charAt(0) }}</span>
+        <UserAvatar
+          :account-id="auth.user?.id"
+          :display-name="auth.user?.displayName ?? ''"
+          :refresh-key="auth.avatarVersion"
+          size="small"
+        />
       </header>
       <main class="page-container"><RouterView /></main>
     </div>

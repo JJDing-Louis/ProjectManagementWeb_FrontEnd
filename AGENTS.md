@@ -118,7 +118,7 @@ Navigation guard 可用於改善導覽體驗與隱藏不可用頁面，但不是
 
 系統角色包含 `Admin`、`Administrator`、`User` 與 `Viewer`，角色名稱須與規格及 API 契約一致，不得在前端自行改名或推導額外角色。
 
-- `Viewer` 只能查看有權限存取的資料，不得新增、修改、刪除、留言或切換 Task 狀態。
+- `Viewer` 可維護本人的名稱與電話；完成 Email 驗證後亦可更換本人大頭貼。除此之外只能查看有權限存取的資料，不得新增、修改、刪除、留言或切換 Task 狀態。
 - 未完成 Email 驗證的帳號只能以 `Viewer` 能力操作，直到後端允許角色異動。
 - UI 可依 capability 控制按鈕、checkbox 與路由入口，但不能只用角色字串取代後端授權。
 - 優先由後端提供 capability／permission 資訊；若 API 尚未提供，角色對應規則必須集中管理，禁止散落在 template 中。

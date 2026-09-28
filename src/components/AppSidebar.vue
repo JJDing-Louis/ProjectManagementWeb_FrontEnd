@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { services } from '@/services'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import type { Project } from '@/types/models'
@@ -105,7 +106,11 @@ async function logout() {
         文 / EN <span>{{ locale === 'zh-TW' ? '繁中' : 'English' }}</span>
       </button>
       <div class="profile-summary">
-        <span class="avatar">{{ auth.user?.displayName.charAt(0) }}</span>
+        <UserAvatar
+          :account-id="auth.user?.id"
+          :display-name="auth.user?.displayName ?? ''"
+          :refresh-key="auth.avatarVersion"
+        />
         <span class="profile-copy"
           ><strong>{{ auth.user?.displayName }}</strong
           ><small>{{ auth.user?.role }}</small></span

@@ -2,6 +2,8 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/PageHeader.vue'
+import AvatarCropper from '@/components/AvatarCropper.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -19,6 +21,9 @@ const preferenceSaveError = ref('')
 const profileFieldErrors = ref<Record<string, string>>({})
 const profileSubmitting = ref(false)
 const preferenceSubmitting = ref(false)
+const avatarSubmitting = ref(false)
+const avatarError = ref('')
+const avatarCropperKey = ref(0)
 const canUpdatePreference = computed(() => auth.hasFunction('preferences.update-own'))
 
 watch(locale, (value) => localStorage.setItem('project-management-web:locale', value))
@@ -91,6 +96,23 @@ async function savePreference() {
     preferenceSubmitting.value = false
   }
 }
+
+async function uploadAvatar(file: File) {
+  if (avatarSubmitting.value) return
+  avatarSubmitting.value = true
+  avatarError.value = ''
+  try {
+    await services.avatar.upload(file)
+    auth.avatarUpdated()
+    avatarCropperKey.value++
+    ui.notify(t('settings.avatarSaved'))
+  } catch (reason) {
+    avatarError.value =
+      reason instanceof ApiError ? reason.message : t('settings.avatarUploadFailed')
+  } finally {
+    avatarSubmitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -133,6 +155,29 @@ async function savePreference() {
             </button>
           </div>
         </form>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h2>{{ t('settings.avatar') }}</h2>
+      </div>
+      <div class="card-body">
+        <UserAvatar
+          :account-id="auth.user?.id"
+          :display-name="auth.user?.displayName ?? ''"
+          :refresh-key="auth.avatarVersion"
+          size="large"
+        />
+        <p v-if="!auth.user?.isVerified">{{ t('settings.avatarVerifyFirst') }}</p>
+        <template v-else>
+          <div v-if="avatarError" class="alert" role="alert">{{ avatarError }}</div>
+          <AvatarCropper
+            :key="avatarCropperKey"
+            :busy="avatarSubmitting"
+            @confirmed="uploadAvatar"
+          />
+        </template>
       </div>
     </section>
 

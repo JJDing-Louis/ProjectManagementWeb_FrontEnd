@@ -54,6 +54,43 @@ test('登入後可載入正式 Project API', async ({ page }, testInfo) => {
   await expect(page.getByRole('heading', { name: '專案列表' })).toBeVisible()
 })
 
+// 測試案例：TC-F-AVATAR-001、003、004、008（desktop／mobile）
+test('可剪裁上傳大頭貼且重新整理後仍顯示', async ({ page }, testInfo) => {
+  await openMobileNavigation(page, testInfo.project.name)
+  await page.getByRole('link', { name: '個人設定' }).click()
+  const imageBase64 = await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1600
+    canvas.height = 1200
+    const context = canvas.getContext('2d')!
+    context.fillStyle = '#cd3456'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/png').split(',')[1]!
+  })
+  await page.getByLabel('選擇 JPG 或 PNG 圖片').setInputFiles({
+    name: 'avatar.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(imageBase64, 'base64'),
+  })
+  await expect(page.getByRole('button', { name: '確認並上傳' })).toBeVisible()
+  await page.getByRole('slider', { name: '垂直位置' }).focus()
+  await page.keyboard.press('End')
+  await page.getByRole('button', { name: '確認並上傳' }).click()
+  const avatarCard = page
+    .locator('section.card')
+    .filter({ has: page.getByRole('heading', { name: '大頭貼' }) })
+  const navigationAvatar =
+    testInfo.project.name === 'mobile'
+      ? page.locator('.mobile-header .avatar img')
+      : page.locator('.sidebar-footer .avatar img')
+  await expect(avatarCard.locator('.avatar img')).toBeVisible()
+  await expect(navigationAvatar).toBeVisible()
+  await page.reload()
+  await expect(avatarCard.locator('.avatar img')).toBeVisible()
+  await expect(navigationAvatar).toBeVisible()
+  await expectNoViewportOverflow(page)
+})
+
 // 測試案例：TC-F-UI-006
 // 測試結果：Passed（desktop／mobile；完整隔離 E2E 22/22）
 // 上次測試時間：2026-09-16 20:44:21 +08:00

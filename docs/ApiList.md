@@ -44,12 +44,16 @@
 | GET    | `/roles`                     | `users.roles()`                | 無                                   | `RoleResponse[]`            |
 | GET    | `/users/me/profile`          | `profile.get()`                | 無                                   | `OwnProfileResponse`        |
 | PUT    | `/users/me/profile`          | `profile.update()`             | `{ name, phoneNumber }`              | `OwnProfileResponse`        |
+| PUT    | `/users/me/avatar`           | `avatar.upload()`              | `multipart/form-data`，`file`        | 204，無回應本文             |
+| GET    | `/users/{id}/avatar`         | `avatar.get()`                 | path `id`                            | 圖片 Blob；無圖時 404       |
 | GET    | `/users/me/preferences`      | `preferences.get()`            | 無                                   | `PreferenceResponse`        |
 | PUT    | `/users/me/preferences`      | `preferences.update()`         | `{ skipBatchConfirmation }`          | `PreferenceResponse`        |
 
 帳號管理頁只允許具有 `accounts.read` 的帳號進入；修改操作仍同時依賴 `accounts.manage-role` 與 `accounts.manage-status`。Users 清單及成員候選人會排除 `isBootstrapAdmin=true` 的系統預設 Admin，Backend 也拒絕修改該帳號。
 
 本人 Profile 的 `name` 必填且最多 100 字元；`phoneNumber` 可為 `null`，非空時最多 30 字元並須通過後端電話格式驗證。電話變更會由 Backend 清除既有電話確認狀態。
+
+大頭貼上傳只限已完成 Email 驗證的本人，不綁角色或 Function。前端先剪裁為 1080 × 1080 JPG／PNG 再上傳；原始選圖最多 10 MiB，最終圖片最多 5 MiB。圖片只存於 `Accounts.AvatarImage`，重新上傳覆寫舊值；讀取端點須帶登入憑證，本人或具 `accounts.read` 者可讀取。無圖的 404 由前端轉為姓名首字備援。
 
 ## Projects 與 Members
 

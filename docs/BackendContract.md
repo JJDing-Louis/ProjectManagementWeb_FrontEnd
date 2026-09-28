@@ -165,6 +165,7 @@ export interface PreferenceResponse {
 - Users 清單與 Project member candidates 不應顯示系統預設 Admin；即使前端漏掉篩選，Backend 仍拒絕修改或加入。
 - Profile `name` trim 後必填且最多 100 字元；`phoneNumber` 可清除，非空時最多 30 字元並須為有效電話格式。
 - 電話變更後，Backend 將 `PhoneNumberConfirmed` 重設為 false；前端目前不顯示電話驗證狀態。
+- 大頭貼不放進 Profile／Users JSON。已驗證帳號可用 `PUT /users/me/avatar` 上傳本人剪裁後的 1080 × 1080 JPG／PNG（`multipart/form-data` 的 `file` 欄位）；原檔最多 10 MiB，最終圖片最多 5 MiB。`GET /users/{id}/avatar` 回傳圖片位元組或無圖 404，只有本人或具 `accounts.read` 者可讀取；每次上傳只覆寫資料庫目前圖片，不保留原圖或舊版。
 
 ## Project
 

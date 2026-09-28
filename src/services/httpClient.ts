@@ -117,7 +117,7 @@ export async function request<T>(
   const retryUnauthorized = options.retryUnauthorized ?? true
   const headers = new Headers(init.headers)
   headers.set('Accept', 'application/json')
-  if (init.body) headers.set('Content-Type', 'application/json')
+  if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
   if (authorize && accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
   const response = await execute(path, { ...init, headers, credentials: 'include' })
   if (response.status === 401 && authorize && retryUnauthorized && (await refreshAccessToken())) {
@@ -126,4 +126,15 @@ export async function request<T>(
   if (!response.ok) throw await toApiError(response)
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
+}
+
+export async function requestBlob(path: string, retryUnauthorized = true): Promise<Blob> {
+  const headers = new Headers({ Accept: 'image/jpeg, image/png' })
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
+  const response = await execute(path, { headers, credentials: 'include' })
+  if (response.status === 401 && retryUnauthorized && (await refreshAccessToken())) {
+    return requestBlob(path, false)
+  }
+  if (!response.ok) throw await toApiError(response)
+  return response.blob()
 }

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { services } from '@/services'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -66,6 +67,12 @@ async function save() {
           <StatusBadge :value="user.role" />
         </div>
         <div class="card-body detail-list">
+          <UserAvatar
+            :account-id="user.id"
+            :display-name="user.displayName"
+            :refresh-key="auth.avatarVersion"
+            size="large"
+          />
           <div class="detail-item">
             <label>{{ t('user.account') }}</label
             ><strong>{{ user.account }}</strong>

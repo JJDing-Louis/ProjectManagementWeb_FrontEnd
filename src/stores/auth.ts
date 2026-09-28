@@ -6,6 +6,7 @@ import type { CurrentUser } from '@/types/models'
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<CurrentUser | null>(null)
   const initialized = ref(false)
+  const avatarVersion = ref(0)
   const isAuthenticated = computed(() => Boolean(user.value))
   const hasFunction = (code: string) => user.value?.functions.includes(code) ?? false
   const isAdmin = computed(() => hasFunction('accounts.manage-role'))
@@ -29,9 +30,14 @@ export const useAuthStore = defineStore('auth', () => {
     if (user.value) user.value = { ...user.value, displayName }
   }
 
+  function avatarUpdated() {
+    avatarVersion.value++
+  }
+
   return {
     user,
     initialized,
+    avatarVersion,
     isAuthenticated,
     isAdmin,
     isTaskAdministrator,
@@ -40,5 +46,6 @@ export const useAuthStore = defineStore('auth', () => {
     signIn,
     signOut,
     updateDisplayName,
+    avatarUpdated,
   }
 })

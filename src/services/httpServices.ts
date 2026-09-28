@@ -1,9 +1,11 @@
 import type { AppServices } from '@/services/contracts'
+import { ApiError } from '@/types/models'
 import {
   authRequest,
   clearAccessToken,
   refreshAccessToken,
   request,
+  requestBlob,
   setAccessToken,
 } from '@/services/httpClient'
 import type {
@@ -471,5 +473,20 @@ export const services: AppServices = {
     get: () => request<OwnProfile>('/users/me/profile'),
     update: (name, phoneNumber) =>
       request<OwnProfile>('/users/me/profile', json('PUT', { name, phoneNumber })),
+  },
+  avatar: {
+    async get(accountId) {
+      try {
+        return await requestBlob(`/users/${accountId}/avatar`)
+      } catch (reason) {
+        if (reason instanceof ApiError && reason.status === 404) return null
+        throw reason
+      }
+    },
+    async upload(file) {
+      const body = new FormData()
+      body.set('file', file)
+      await request<void>('/users/me/avatar', { method: 'PUT', body })
+    },
   },
 }

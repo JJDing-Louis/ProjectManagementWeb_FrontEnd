@@ -93,6 +93,11 @@ export interface ProfileService {
   update(name: string, phoneNumber: string | null): Promise<OwnProfile>
 }
 
+export interface AvatarService {
+  get(accountId: string): Promise<Blob | null>
+  upload(file: File): Promise<void>
+}
+
 export interface AppServices {
   auth: AuthService
   users: UserService
@@ -100,4 +105,5 @@ export interface AppServices {
   tasks: TaskItemService
   preferences: PreferenceService
   profile: ProfileService
+  avatar: AvatarService
 }

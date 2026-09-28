@@ -6,15 +6,20 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { ApiError } from '@/types/models'
 import SettingsView from '@/views/SettingsView.vue'
+import AvatarCropper from '@/components/AvatarCropper.vue'
 
 const serviceMocks = vi.hoisted(() => ({
   preferences: { get: vi.fn(), update: vi.fn() },
   profile: { get: vi.fn(), update: vi.fn() },
+  avatar: { get: vi.fn(), upload: vi.fn() },
 }))
 
 vi.mock('@/services', () => ({ services: serviceMocks }))
 
-async function mountView(functions = ['preferences.read-own', 'preferences.update-own']) {
+async function mountView(
+  functions = ['preferences.read-own', 'preferences.update-own'],
+  verified = true,
+) {
   const pinia = createPinia()
   setActivePinia(pinia)
   useAuthStore().user = {
@@ -23,7 +28,7 @@ async function mountView(functions = ['preferences.read-own', 'preferences.updat
     displayName: 'Member',
     email: 'member@example.test',
     role: functions.includes('preferences.update-own') ? 'User' : 'Viewer',
-    isVerified: true,
+    isVerified: verified,
     isEnabled: true,
     functions,
   }
@@ -37,6 +42,7 @@ describe('SettingsView', () => {
     vi.clearAllMocks()
     serviceMocks.profile.get.mockResolvedValue({ name: 'Member', phoneNumber: '0912-345-678' })
     serviceMocks.preferences.get.mockResolvedValue({ skipBatchConfirmation: false })
+    serviceMocks.avatar.get.mockResolvedValue(null)
   })
 
   it('個人設定載入失敗時顯示錯誤且不顯示未載入的表單', async () => {
@@ -120,5 +126,54 @@ describe('SettingsView', () => {
     await flushPromises()
     expect(useUiStore().toast).toBe('資料已儲存')
     expect(saveButton.attributes('disabled')).toBeUndefined()
+  })
+
+  it('信箱未驗證時沒有大頭貼上傳入口', async () => {
+    const wrapper = await mountView(['preferences.read-own'], false)
+
+    expect(wrapper.text()).toContain('請先完成信箱驗證')
+    expect(wrapper.findComponent(AvatarCropper).exists()).toBe(false)
+    expect(serviceMocks.avatar.upload).not.toHaveBeenCalled()
+  })
+
+  it('不支援的圖片格式會在剪裁前拒絕且不呼叫上傳API', async () => {
+    const wrapper = await mountView()
+    const input = wrapper.get<HTMLInputElement>('#avatar-file')
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: [new File(['GIF89a'], 'avatar.gif', { type: 'image/gif' })],
+    })
+
+    await input.trigger('change')
+
+    expect(wrapper.text()).toContain('只支援 JPG、JPEG 與 PNG 圖片')
+    expect(wrapper.find('#avatar-zoom').exists()).toBe(false)
+    expect(serviceMocks.avatar.upload).not.toHaveBeenCalled()
+  })
+
+  it('已驗證Viewer可上傳並刷新大頭貼版本', async () => {
+    serviceMocks.avatar.upload.mockResolvedValue(undefined)
+    const wrapper = await mountView(['preferences.read-own'])
+    const file = new File(['image'], 'avatar.png', { type: 'image/png' })
+
+    wrapper.getComponent(AvatarCropper).vm.$emit('confirmed', file)
+    await flushPromises()
+
+    expect(serviceMocks.avatar.upload).toHaveBeenCalledExactlyOnceWith(file)
+    expect(useAuthStore().avatarVersion).toBe(1)
+    expect(useUiStore().toast).toBe('大頭貼已更新。')
+  })
+
+  it('上傳失敗時顯示錯誤且不刷新既有圖片', async () => {
+    serviceMocks.avatar.upload.mockRejectedValue(new ApiError(503, '圖片服務暫時無法使用。'))
+    const wrapper = await mountView()
+
+    wrapper
+      .getComponent(AvatarCropper)
+      .vm.$emit('confirmed', new File(['image'], 'avatar.png', { type: 'image/png' }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('圖片服務暫時無法使用。')
+    expect(useAuthStore().avatarVersion).toBe(0)
   })
 })
