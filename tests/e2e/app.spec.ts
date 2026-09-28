@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { expect, test } from '@playwright/test'
 
 const account = process.env.PMW_E2E_ACCOUNT ?? 'admin'
